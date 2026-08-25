@@ -1,125 +1,169 @@
+import {
+  addSideGame,
+  anonymizeIdentity,
+  createRound,
+  finishRound,
+  joinRound,
+  scoreRound,
+  type AddSideGameInput,
+  type CompletedRound,
+  type CreateRoundInput,
+  type DeleteIdentityResult,
+  type EndTieRule,
+  type GameMode,
+  type HoleTieRule,
+  type JoinRoundInput,
+  type Round,
+  type RoundStore,
+  type ScoreRoundInput,
+  type UpdateRoundPlayerInput,
+  startRound,
+  updateRoundPlayer,
+} from './store/round-store.js';
 import { randomUUID } from 'node:crypto';
-import { allocateRelativeHandicapStrokes, netHoleScore, talmaMaster } from '@vaylakaverit/domain';
 
-type PreviewPlayer = {
-  id: string;
-  name: string;
-  teeLabel: string;
-  handicapIndex: number;
-};
+export type PreviewRound = Round;
+export type CompletedPreviewRound = CompletedRound;
 
-type PreviewRound = {
-  id: string;
-  courseName: string;
-  joinLink: string;
-  players: PreviewPlayer[];
-  scores: Record<string, Record<number, number>>;
-  game: {
-    mode: 'scratch' | 'handicap';
-    reward: string;
-  };
-  standings: {
-    completedHoles: number;
-    winsByPlayerId: Record<string, number>;
-  };
-};
+export class PreviewRoundStore implements RoundStore {
+  private readonly rounds = new Map<string, Round>();
+  private readonly completedRounds = new Map<string, CompletedRound>();
+  private readonly processedScoreChangeIds = new Map<string, Set<string>>();
 
-const rounds = new Map<string, PreviewRound>();
+  public create(input: CreateRoundInput): Round {
+    const round = createRound(input);
+    this.rounds.set(round.id, round);
+    this.processedScoreChangeIds.set(round.id, new Set());
+    return round;
+  }
+
+  public get(roundId: string): Round | undefined {
+    return this.rounds.get(roundId);
+  }
+
+  public getByInvitationToken(invitationToken: string): Round | undefined {
+    return [...this.rounds.values()].find((round) => round.invitationToken === invitationToken);
+  }
+
+  public join(input: JoinRoundInput): Round | undefined {
+    const round = this.rounds.get(input.roundId);
+    return round ? joinRound(round, input) : undefined;
+  }
+
+  public updatePlayer(input: UpdateRoundPlayerInput): Round | undefined {
+    const round = this.rounds.get(input.roundId);
+    return round ? updateRoundPlayer(round, input) : undefined;
+  }
+
+  public start(roundId: string): Round | undefined {
+    const round = this.rounds.get(roundId);
+    return round ? startRound(round) : undefined;
+  }
+
+  public score(input: ScoreRoundInput): Round | undefined {
+    const round = this.rounds.get(input.roundId);
+    if (!round) {
+      return undefined;
+    }
+
+    const processedChanges = this.processedScoreChangeIds.get(input.roundId) ?? new Set<string>();
+    this.processedScoreChangeIds.set(input.roundId, processedChanges);
+    return scoreRound(round, input, processedChanges);
+  }
+
+  public addSideGame(input: AddSideGameInput): Round | undefined {
+    const round = this.rounds.get(input.roundId);
+    return round ? addSideGame(round, input) : undefined;
+  }
+
+  public finish(roundId: string): CompletedRound | undefined {
+    const round = this.rounds.get(roundId);
+    if (!round || round.state !== 'active') {
+      return undefined;
+    }
+
+    const completedRound = finishRound(round);
+    this.rounds.delete(roundId);
+    this.processedScoreChangeIds.delete(roundId);
+    this.completedRounds.set(roundId, completedRound);
+    return completedRound;
+  }
+
+  public history(): CompletedRound[] {
+    return [...this.completedRounds.values()].sort((left, right) =>
+      right.completedAt.localeCompare(left.completedAt),
+    );
+  }
+
+  public getHistory(roundId: string): CompletedRound | undefined {
+    return this.completedRounds.get(roundId);
+  }
+
+  public deleteIdentity(identityId: string): DeleteIdentityResult {
+    let anonymizedRoundCount = 0;
+
+    for (const round of this.rounds.values()) {
+      if (anonymizeIdentity(round, identityId)) {
+        anonymizedRoundCount += 1;
+      }
+    }
+
+    for (const round of this.completedRounds.values()) {
+      if (anonymizeIdentity(round, identityId)) {
+        anonymizedRoundCount += 1;
+      }
+    }
+
+    return { anonymizedRoundCount };
+  }
+}
+
+export const previewRoundStore = new PreviewRoundStore();
 
 export function createPreviewRound(
   name: string,
   handicapIndex: number,
-  mode: 'scratch' | 'handicap',
+  mode: GameMode,
   reward: string,
+  identityId = `guest:${randomUUID()}`,
+  holeTieRule?: HoleTieRule,
+  endTieRule?: EndTieRule,
+  teeLabel?: string,
+  ratingTable?: string,
 ): PreviewRound {
-  const id = randomUUID();
-  const player = createPlayer(name, handicapIndex);
-  const round: PreviewRound = {
-    id,
-    courseName: talmaMaster.name,
-    joinLink: `/join/${id}`,
-    players: [player],
-    scores: {},
-    game: {
-      mode,
-      reward,
-    },
-    standings: {
-      completedHoles: 0,
-      winsByPlayerId: { [player.id]: 0 },
-    },
-  };
-
-  rounds.set(id, round);
-  return round;
+  return previewRoundStore.create({
+    identityId,
+    name,
+    handicapIndex,
+    mode,
+    reward,
+    holeTieRule,
+    endTieRule,
+    teeLabel,
+    ratingTable,
+  });
 }
+
 export function getPreviewRound(roundId: string): PreviewRound | undefined {
-  return rounds.get(roundId);
-}
-
-function calculateStandings(round: PreviewRound): PreviewRound['standings'] {
-  const winsByPlayerId = Object.fromEntries(round.players.map((player) => [player.id, 0]));
-  const allocations =
-    round.game.mode === 'handicap'
-      ? allocateRelativeHandicapStrokes(
-          round.players.map((player) => ({
-            playerId: player.id,
-            playingHandicap: Math.round(player.handicapIndex),
-          })),
-        ).strokesByPlayerId
-      : new Map(round.players.map((player) => [player.id, 0]));
-
-  let completedHoles = 0;
-
-  for (const hole of talmaMaster.holes) {
-    const holeScores = round.players.map((player) => ({
-      playerId: player.id,
-      gross: round.scores[player.id]?.[hole.number],
-    }));
-
-    if (holeScores.some((score) => score.gross === undefined)) {
-      continue;
-    }
-
-    completedHoles += 1;
-    const bestScore = Math.min(
-      ...holeScores.map((score) =>
-        round.game.mode === 'handicap'
-          ? netHoleScore(score.gross!, allocations.get(score.playerId) ?? 0, hole.handicapIndex)
-          : score.gross!,
-      ),
-    );
-    const winners = holeScores.filter((score) => {
-      const scoreForGame =
-        round.game.mode === 'handicap'
-          ? netHoleScore(score.gross!, allocations.get(score.playerId) ?? 0, hole.handicapIndex)
-          : score.gross!;
-      return scoreForGame === bestScore;
-    });
-
-    if (winners.length === 1) {
-      const winnerId = winners[0]!.playerId;
-      winsByPlayerId[winnerId] = (winsByPlayerId[winnerId] ?? 0) + 1;
-    }
-  }
-
-  return { completedHoles, winsByPlayerId };
+  return previewRoundStore.get(roundId);
 }
 
 export function joinPreviewRound(
   roundId: string,
   name: string,
   handicapIndex: number,
+  identityId = `guest:${randomUUID()}`,
+  teeLabel?: string,
+  ratingTable?: string,
 ): PreviewRound | undefined {
-  const round = rounds.get(roundId);
-
-  if (!round || !name || round.players.length >= 4) {
-    return undefined;
-  }
-
-  round.players.push(createPlayer(name, handicapIndex));
-  round.standings.winsByPlayerId[round.players.at(-1)!.id] = 0;
-  return round;
+  return previewRoundStore.join({
+    roundId,
+    identityId,
+    name,
+    handicapIndex,
+    teeLabel,
+    ratingTable,
+  });
 }
 
 export function recordPreviewScore(
@@ -127,26 +171,51 @@ export function recordPreviewScore(
   playerId: string,
   holeNumber: number,
   strokes: number,
+  changeId?: string,
+  expectedRevision?: number,
 ): PreviewRound | undefined {
-  const round = rounds.get(roundId);
-  const playerExists = round?.players.some((player) => player.id === playerId);
-
-  if (!round || !playerExists || holeNumber < 1 || holeNumber > 18 || strokes < 1) {
-    return undefined;
-  }
-
-  const playerScores = round.scores[playerId] ?? {};
-  playerScores[holeNumber] = strokes;
-  round.scores[playerId] = playerScores;
-  round.standings = calculateStandings(round);
-  return round;
+  return previewRoundStore.score({
+    roundId,
+    playerId,
+    holeNumber,
+    strokes,
+    changeId,
+    expectedRevision,
+  });
 }
 
-function createPlayer(name: string, handicapIndex: number): PreviewPlayer {
-  return {
-    id: randomUUID(),
-    name,
-    teeLabel: talmaMaster.defaultTeeLabel,
-    handicapIndex,
-  };
+export function addPreviewSideGame(
+  roundId: string,
+  startHole: number,
+  holeCount: number,
+  mode: GameMode,
+  reward: string,
+  holeTieRule?: HoleTieRule,
+  carryEligiblePlayerIds?: string[],
+  endTieRule?: EndTieRule,
+  playerIds?: string[],
+): PreviewRound | undefined {
+  return previewRoundStore.addSideGame({
+    roundId,
+    startHole,
+    holeCount,
+    mode,
+    reward,
+    holeTieRule,
+    carryEligiblePlayerIds,
+    endTieRule,
+    playerIds,
+  });
+}
+
+export function completePreviewRound(roundId: string): CompletedPreviewRound | undefined {
+  return previewRoundStore.finish(roundId);
+}
+
+export function listCompletedPreviewRounds(): CompletedPreviewRound[] {
+  return previewRoundStore.history();
+}
+
+export function getCompletedPreviewRound(roundId: string): CompletedPreviewRound | undefined {
+  return previewRoundStore.getHistory(roundId);
 }
