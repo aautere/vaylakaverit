@@ -17,7 +17,14 @@ function createContainerMock(): Container {
             const state = querySpec.parameters?.find(
               (parameter) => parameter.name === '@state',
             )?.value;
-            return state === undefined || document.state === state;
+            const invitation = querySpec.parameters?.find(
+              (parameter) => parameter.name === '@invitationToken',
+            )?.value;
+            const round = document.round as { invitationToken?: unknown } | undefined;
+            return (
+              (state === undefined || document.state === state) &&
+              (invitation === undefined || round?.invitationToken === invitation)
+            );
           }),
         }),
       }),
@@ -136,6 +143,43 @@ describe('CosmosRoundStore', () => {
       invitationToken: round.invitationToken,
       invitationExpiresAt: expect.any(String),
       invitationRevokedAt: expect.any(String),
+    });
+  });
+
+  it('lets a separate API store instance find and join an unstarted invitation', async () => {
+    const container = createContainerMock();
+    const creatorStore = new CosmosRoundStore(container);
+    const recipientStore = new CosmosRoundStore(container);
+    const round = await creatorStore.create({
+      identityId: 'guest:aino',
+      name: 'Aino',
+      handicapIndex: 18,
+      mode: 'scratch',
+      reward: '',
+    });
+
+    await expect(recipientStore.getByInvitationToken(round.invitationToken)).resolves.toMatchObject(
+      {
+        id: round.id,
+        state: 'lobby',
+      },
+    );
+
+    const invitation = { ['invitationToken']: round.invitationToken };
+    const joinedRound = await recipientStore.join({
+      roundId: round.id,
+      ...invitation,
+      identityId: 'guest:elli',
+      name: 'Elli',
+      handicapIndex: 18,
+    });
+
+    expect(joinedRound?.players.map((player) => player.name)).toEqual(['Aino', 'Elli']);
+    await expect(creatorStore.get(round.id)).resolves.toMatchObject({
+      players: [
+        expect.objectContaining({ name: 'Aino' }),
+        expect.objectContaining({ name: 'Elli' }),
+      ],
     });
   });
 
