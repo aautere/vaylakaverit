@@ -123,9 +123,10 @@ from old clients and invitation holders.
   `course-data/rock-golf.md`, eBirdie provides the official 18-hole handicap-index sequence.
   The 9-hole layout normalizes the first-pass odd indexes to the 1–9 scale: `(first-pass index +
   1) / 2`. Its sequence is 3, 6, 4, 8, 9, 1, 7, 2, and 5. For each physical hole, the 18-hole
-  second pass uses the first-pass index plus one, producing the even indexes. Rock Golf must still
-  publish or confirm the men's rating/slope tables, playing-handicap lookup data, and their
-  effective date before enabling the initial configuration. Women's values are intentionally
-  outside that initial configuration.
+  second pass uses the first-pass index plus one, producing the even indexes. Rock Golf's linked
+  calculator provides men's rating/slope values, but its tee lengths conflict with Rock Golf's
+  published length page. Rock Golf must resolve that version difference and provide the men's
+  playing-handicap lookup data and effective date before enabling the initial configuration.
+  Women's values are intentionally outside that initial configuration.
 - Confirm whether the official source designates a preferred default tee for Rock Golf; otherwise
   the product owner must choose one explicitly before implementation.

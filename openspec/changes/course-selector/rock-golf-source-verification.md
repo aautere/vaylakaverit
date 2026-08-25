@@ -43,12 +43,12 @@ retrieval date only.
 | 9 | 3 | 162 | 134 | 127 | 110 |
 | **Total** | **27** | **1474** | **1314** | **1159** | **934** |
 
-The official club pages do not publish the required hole-handicap indexes, men's or women's course
-ratings, slope ratings, or a versioned playing-handicap table. Rock Golf's official slope page
-links to an interactive calculator, but the calculator is not a published rating table and its
-retrievable background values conflict with the club's published hole lengths. The club's published
-length page is therefore the only recorded source for tee lengths; calculator background data is
-not adopted.
+The official club pages do not publish a versioned playing-handicap table. Rock Golf's official
+slope page links to an interactive calculator that provides the men's Course Rating and Slope
+Rating values recorded in `course-data/rock-golf.md`. Its retrievable background tee lengths conflict
+with the club's published hole lengths, so the calculator is used only for its rating data pending
+Rock Golf's source-version confirmation. The club's published length page remains the source for tee
+lengths.
 
 The product owner transcribed the official 18-hole handicap-index sequence from eBirdie, Suomen
 Golfliitto's official mobile application, on 2026-08-25. The product owner confirmed that the
@@ -59,14 +59,14 @@ is its first-pass counterpart plus one. The nine-hole values are normalized to t
 ## Blocking data gap
 
 The official eBirdie transcription provides the 18-hole handicap indexes and its first-pass values
-for the 9-hole layout. The calculator does not provide a club-published, versioned
-playing-handicap lookup table or a stated effective date for its values.
+for the 9-hole layout. The linked calculator does not provide a club-published, versioned
+playing-handicap lookup table or a stated rating effective date.
 
 Do not add Rock Golf to the selectable course registry or enable handicap match play until Rock Golf
 provides:
 
-1. the official men's and women's Course Rating and Slope Rating values for each tee and offered
-   length;
-2. the official playing-handicap values or written calculation policy for both offered lengths and
-   rating tables; and
-3. the effective date of those values.
+1. confirmation that the Rock Golf published tee lengths and the linked calculator's rating data
+   refer to the same current course version, or replacement current rating data;
+2. the official men's playing-handicap values or written calculation policy for both offered
+   lengths; and
+3. the effective date of the rating and playing-handicap data.

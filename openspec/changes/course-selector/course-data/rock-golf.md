@@ -12,16 +12,25 @@
 | Rockin väylien pituudet | Rock Golf | https://rockgolf.fi/rockin-vaylapituudet/ | 2026-08-25 | Not stated | Nine-hole tee labels, per-hole lengths, and all-par-3 course description. |
 | Q&A | Rock Golf | https://rockgolf.fi/q-a/ | 2026-08-25 | Not stated | An 18-hole round is two booked nine-hole rounds. |
 | eBirdie mobile application | Suomen Golfliitto | https://golf.fi/pelaajalle/ebirdie/ | 2026-08-25 | Not stated | Official 18-hole scorecard handicap indexes, transcribed by the product owner; its first pass is the confirmed 9-hole sequence and each second-pass index is first-pass index plus one. |
+| Rock-linked slope calculator | Rock Golf / HMS | https://rockgolf.fi/slope-laskin/ | 2026-08-26 | Per-tee update timestamps only | Men's Course Rating and Slope Rating values from the calculator linked by Rock Golf. |
 
 ## Layouts and tees
 
 | Layout | Holes | Total par | Tee | Total metres | Men CR / slope | Women CR / slope | Source |
 | --- | ---: | ---: | --- | ---: | --- | --- | --- |
-| 9 holes | 9 | 27 | R | 1474 | Missing | Not supported initially | Rockin väylien pituudet |
-| 9 holes | 9 | 27 | O | 1314 | Missing | Not supported initially | Rockin väylien pituudet |
-| 9 holes | 9 | 27 | C | 1159 | Missing | Not supported initially | Rockin väylien pituudet |
-| 9 holes | 9 | 27 | K | 934 | Missing | Not supported initially | Rockin väylien pituudet |
-| 18 holes | 18 | 54 | R, O, C, K | Two 9-hole passes | Missing | Not supported initially | Rock Golf Q&A |
+| 9 holes | 9 | 27 | R | 1474 | 28.6 / 102 | Not supported initially | Rock Golf / linked calculator |
+| 9 holes | 9 | 27 | O | 1314 | 28.1 / 100 | Not supported initially | Rock Golf / linked calculator |
+| 9 holes | 9 | 27 | C | 1159 | 27.5 / 98 | Not supported initially | Rock Golf / linked calculator |
+| 9 holes | 9 | 27 | K | 934 | 26.6 / 95 | Not supported initially | Rock Golf / linked calculator |
+| 18 holes | 18 | 54 | R | 2876 | 57.2 / 102 | Not supported initially | Linked calculator |
+| 18 holes | 18 | 54 | O | 2594 | 56.2 / 100 | Not supported initially | Linked calculator |
+| 18 holes | 18 | 54 | C | 2318 | 55.0 / 98 | Not supported initially | Rock Golf Q&A / linked calculator |
+| 18 holes | 18 | 54 | K | 1868 | 53.2 / 95 | Not supported initially | Rock Golf Q&A / linked calculator |
+
+The calculator reports different 9-hole total lengths for R (1438) and O (1297), and different
+18-hole totals for R (2876) and O (2594), than the two-pass totals derived from Rock Golf's
+published length page. Its men’s rating and slope values are recorded but remain pending
+source-version confirmation.
 
 ## Hole data
 
@@ -63,8 +72,8 @@ first-pass index plus one: 5/6, 11/12, 7/8, 15/16, 17/18, 1/2, 13/14, 3/4, and 9
 ## Playing-handicap data
 
 No official men's playing-handicap lookup table or written calculation policy has been retrieved.
-Men's Course Rating and Slope Rating values are also missing for both offered lengths. The women's
-table is intentionally not supported in Rock Golf's initial product configuration.
+The linked calculator provides men's rating/slope values but does not state their effective date.
+The women's table is intentionally not supported in Rock Golf's initial product configuration.
 
 ## Data checks
 
@@ -80,6 +89,6 @@ table is intentionally not supported in Rock Golf's initial product configuratio
 ## Blockers and handoff
 
 Rock Golf cannot yet be configured or shown in the course selector. Rock Golf or Suomen Golfliitto
-must provide the men's Course Rating and Slope Rating tables for both lengths, the men's
-playing-handicap policy or lookup values, and their effective date. Women's values are not required
-for the initial Rock Golf configuration.
+must confirm whether the linked calculator's ratings match the current published course lengths,
+provide the men's playing-handicap policy or lookup values, and state the effective date. Women's
+values are not required for the initial Rock Golf configuration.
