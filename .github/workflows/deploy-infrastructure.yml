@@ -29,6 +29,6 @@ jobs:
       - run: |
           az bicep install
           az deployment sub create \
-            --location swedencentral \
+            --location westeurope \
             --template-file infra/main.bicep \
             --parameters environmentName=${{ inputs.environment }}

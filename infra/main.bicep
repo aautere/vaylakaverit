@@ -7,7 +7,7 @@ targetScope = 'subscription'
 param environmentName string
 
 @description('Azure region for all regional resources.')
-param location string = 'swedencentral'
+param location string = 'westeurope'
 
 @description('A short resource-name prefix. Use lowercase letters and numbers only.')
 param namePrefix string = 'vaylakaverit'

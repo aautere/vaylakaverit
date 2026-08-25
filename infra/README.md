@@ -44,7 +44,7 @@ Provisioning creates billable Azure resources. After an explicit approval:
 ```bash
 az login
 az deployment sub create \
-  --location swedencentral \
+  --location westeurope \
   --template-file infra/main.bicep \
   --parameters environmentName=development
 ```
