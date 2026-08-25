@@ -24,7 +24,9 @@ case "$args" in
 *'deployment sub show'*'outputs.applicationInsightsName'*) echo 'insights' ;;
 *'deployment sub show'*'outputs.functionAppUrl'*) echo 'https://fn-app.example.net' ;;
 *'deployment sub show'*'outputs.staticWebsiteEndpoint'*) echo 'https://web.example.net/' ;;
-*'functionapp function list'*) printf '%s\n' ${STUB_FUNCTIONS-health createRound} ;;
+*'functionapp function list'*)
+  for fn in ${STUB_FUNCTIONS-health createRound}; do echo "fn-app/$fn"; done
+  ;;
 *'functionapp identity show'*) echo 'principal-id' ;;
 *'storage account show'*) echo '/scope/storage' ;;
 *'monitor app-insights component show'*) echo '/scope/insights' ;;
@@ -56,7 +58,8 @@ elif [[ "$args" == *'--dump-header'* ]]; then
 else
   case "$url" in
   'https://fn-app.example.net/api/health') echo "${STUB_HEALTH_BODY-\{\"status\":\"ok\"\}}" ;;
-  'https://web.example.net/') echo "${STUB_INDEX_HTML-<script src=\"https://fn-app.example.net/assets/index.js\"></script>}" ;;
+  'https://web.example.net/') echo "${STUB_INDEX_HTML-<script type=\"module\" src=\"/assets/index-abc123.js\"></script>}" ;;
+  'https://web.example.net/assets/index-abc123.js') echo "${STUB_BUNDLE_JS-const o=\"https://fn-app.example.net\";}" ;;
   *) echo '' ;;
   esac
 fi
@@ -118,7 +121,8 @@ expect_failure 'a missing health function' 'health function is not indexed' env 
 expect_failure 'an unhealthy API' 'returned 503' env STUB_HEALTH_STATUS='503'
 expect_failure 'a blocked preflight' 'does not allow preflighted requests' env STUB_CORS='off'
 expect_failure 'a static site answering the API' 'static website answered' env STUB_STORAGE_API_STATUS='200'
-expect_failure 'a PWA built for the wrong origin' 'does not reference' env STUB_INDEX_HTML='<script src="/assets/index.js"></script>'
+expect_failure 'a PWA bundle built for the wrong origin' 'bundle does not reference' env STUB_BUNDLE_JS='const o="/api";'
+expect_failure 'a PWA with no built bundle' 'does not reference a built script bundle' env STUB_INDEX_HTML='<div id="root"></div>'
 expect_failure 'a missing storage role' "missing 'Storage Blob Data Owner'" env STUB_STORAGE_ROLES=$'Storage Queue Data Contributor\n'
 expect_failure 'missing telemetry access' "missing 'Monitoring Metrics Publisher'" env STUB_INSIGHTS_ROLES=''
 
