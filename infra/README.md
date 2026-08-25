@@ -17,6 +17,13 @@ Function App's HTTPS origin in `VITE_API_ORIGIN`, while local Vite development c
 relative `/api` requests to `127.0.0.1:7071`. The Function App allows the static website origin
 through its `WEB_ORIGIN` setting.
 
+Because the PWA calls the API cross-origin, the Function App also declares the static website
+origin in its platform CORS configuration. The Functions host answers `OPTIONS` preflight requests
+itself and never routes them to a function, so a catch-all `OPTIONS` handler in application code
+cannot authorise a preflight. Without the platform setting the host returns `204` with no
+`Access-Control-Allow-Origin` header and the browser blocks every request that carries
+`content-type: application/json`, `authorization`, or `x-preview-guest-id`.
+
 Deploy the Function package with the `deploy-api` workflow before deploying the PWA with
 `deploy-web`. Both workflows derive the active environment's resource names from the infrastructure
 deployment outputs and use the GitHub environment's federated Azure identity; no API secrets are
