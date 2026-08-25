@@ -77,7 +77,8 @@ indexed_functions="$(
     --name "$function_app_name" \
     --query '[].name' \
     --output tsv \
-    --only-show-errors
+    --only-show-errors |
+    sed "s|^$function_app_name/||"
 )"
 
 if [ -z "$indexed_functions" ]; then
@@ -139,12 +140,16 @@ else
   pass "the static website does not serve the API, as expected"
 fi
 
-if http_body "$web_origin/" | grep -q "$api_origin"; then
-  pass "the published PWA is built against the Function App origin"
+# Vite injects the API origin into the bundle, not into index.html, so the
+# origin has to be checked in the script the document loads.
+bundle_path="$(http_body "$web_origin/" | grep -oE '/assets/[^"]+\.js' | head -n 1 || true)"
+if [ -z "$bundle_path" ]; then
+  fail "the published PWA does not reference a built script bundle"
+elif http_body "$web_origin$bundle_path" | grep -q "$api_origin"; then
+  pass "the published PWA bundle is built against the Function App origin"
 else
-  fail "the published PWA does not reference $api_origin"
+  fail "the published PWA bundle does not reference $api_origin"
 fi
-
 # Managed identity access is granted outside Bicep because the deployment
 # identity intentionally holds Contributor, not User Access Administrator.
 function_principal_id="$(
