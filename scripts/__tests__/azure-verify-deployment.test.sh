@@ -122,4 +122,15 @@ expect_failure 'a PWA built for the wrong origin' 'does not reference' env STUB_
 expect_failure 'a missing storage role' "missing 'Storage Blob Data Owner'" env STUB_STORAGE_ROLES=$'Storage Queue Data Contributor\n'
 expect_failure 'missing telemetry access' "missing 'Monitoring Metrics Publisher'" env STUB_INSIGHTS_ROLES=''
 
+# The script reads resource names from the subscription-scoped deployment. An
+# output that only exists on the module is empty at that scope, which strands
+# the script on a real environment.
+main_template="$repo_root/infra/main.bicep"
+while read -r output_name; do
+  grep -qE "^output $output_name " "$main_template" || {
+    echo "FAIL: the script reads '$output_name', which infra/main.bicep does not output"
+    exit 1
+  }
+done < <(grep -oE 'deployment_output [a-zA-Z]+' "$script" | awk '{print $2}' | sort -u)
+
 echo 'Azure deployment verification tests passed.'

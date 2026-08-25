@@ -37,5 +37,6 @@ module application 'resources.bicep' = {
 output resourceGroupName string = resourceGroup.name
 output staticWebsiteEndpoint string = application.outputs.staticWebsiteEndpoint
 output functionAppName string = application.outputs.functionAppName
+output functionAppUrl string = application.outputs.functionAppUrl
 output storageAccountName string = application.outputs.storageAccountName
 output applicationInsightsName string = application.outputs.applicationInsightsName
