@@ -49,6 +49,11 @@ Data Contributor` only to the created Function App identity on its backing Stora
 grants the GitHub deployment identity `Storage Blob Data Contributor`, which is required by the
 `deploy-web` workflow to enable the static website and upload PWA files.
 
+An Azure RBAC administrator must also grant the Function App identity `Web PubSub Service Owner` on
+the provisioned Web PubSub resource. The API uses its managed identity to issue participant-scoped
+client tokens and publish `round:<round-id>` group events; it does not use a Web PubSub key or
+connection string.
+
 ## Local validation
 
 ```bash

@@ -134,6 +134,14 @@ resource functionAppSettings 'Microsoft.Web/sites/config@2024-04-01' = {
     AzureWebJobsStorage__tableServiceUri: storageAccount.properties.primaryEndpoints.table
     APPLICATIONINSIGHTS_CONNECTION_STRING: applicationInsights.properties.ConnectionString
     APPLICATIONINSIGHTS_AUTHENTICATION_STRING: 'Authorization=AAD'
+    ROUND_STORE: 'cosmos'
+    COSMOS_ENDPOINT: cosmosAccount.properties.documentEndpoint
+    COSMOS_DATABASE_ID: cosmosDatabase.name
+    COSMOS_CONTAINER_ID: roundsContainer.name
+    ROUND_UPDATE_TRANSPORT: 'web-pubsub'
+    WEB_PUBSUB_ENDPOINT: 'https://${webPubSub.name}.webpubsub.azure.com'
+    WEB_PUBSUB_HUB: 'rounds'
+    WEB_ORIGIN: join(take(split(storageAccount.properties.primaryEndpoints.web, '/'), 3), '/')
   }
 }
 
