@@ -26,9 +26,9 @@
 ```mermaid
 flowchart LR
   GH[GitHub repository] -->|GitHub Actions OIDC| AZ[Azure resource group]
-  P1[Player iPhone PWA] --> SWA[Azure Static Web Apps]
-  P2[Player iPhone PWA] --> SWA
-  P3[Player iPhone PWA] --> SWA
+  P1[Player iPhone PWA] --> WEB[Azure Storage Static Website]
+  P2[Player iPhone PWA] --> WEB
+  P3[Player iPhone PWA] --> WEB
   P1 <-->|HTTPS API| API[Azure Functions Flex Consumption]
   P2 <-->|HTTPS API| API
   P3 <-->|HTTPS API| API
@@ -39,7 +39,7 @@ flowchart LR
   API --> KV[Azure Key Vault]
   API --> APPLE[Apple identity provider]
   API --> WPS
-  AZ --- SWA
+  AZ --- WEB
   AZ --- API
   AZ --- DB
   AZ --- WPS
@@ -50,7 +50,7 @@ flowchart LR
 
 | Azure service                        | Responsibility                                                                                                                                                                                                 |
 | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Azure Static Web Apps                | Serves the PWA globally over HTTPS, including installable web-app assets.                                                                                                                                      |
+| Azure Storage Static Website         | Serves the installable PWA as static assets from Sweden Central.                                                                                                                                               |
 | Azure Functions Flex Consumption     | Runs the HTTP API, score validation, game evaluation, invitation handling, and real-time event publication. It scales application compute to zero when idle.                                                   |
 | Azure Cosmos DB serverless           | Persists player, round, score, game, invitation, and history records with request-based capacity.                                                                                                              |
 | Azure Web PubSub                     | Delivers authenticated low-latency round updates to active round participants without application-managed WebSocket servers. The first release uses the Free tier, capped at 20 concurrent client connections. |
@@ -61,6 +61,12 @@ All services are deployed into one Azure resource group per environment through 
 environment uses a region close to Finnish users, subject to service availability. The
 implementation must verify the region, SKU availability, cold-start behaviour, and idle cost
 against the one-second update objective before production deployment.
+
+Cost guardrails are encoded in Bicep: Storage Static Website and Web PubSub use their lowest-cost
+tiers,
+Functions uses 512 MB Flex Consumption instances with no always-ready instances and a maximum of
+five concurrent instances, Cosmos DB is serverless and non-zonal, Storage is Standard LRS, and
+Application Insights stops telemetry after 0.1 GB of daily ingestion.
 
 The PWA renders the round, accepts the current player's score input, displays a creator's QR
 code, and subscribes to the round's live updates. It keeps a durable local outbox for a player's

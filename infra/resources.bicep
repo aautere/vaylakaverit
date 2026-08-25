@@ -6,7 +6,6 @@ var suffix = toLower(take(uniqueString(subscription().id, resourceGroup().id, en
 var compactPrefix = replace(namePrefix, '-', '')
 var storageName = take('${compactPrefix}${environmentName}${suffix}', 24)
 var functionAppName = '${namePrefix}-${environmentName}-api-${suffix}'
-var staticWebAppName = '${namePrefix}-${environmentName}-web-${suffix}'
 var cosmosAccountName = '${namePrefix}-${environmentName}-cosmos-${suffix}'
 var webPubSubName = '${namePrefix}-${environmentName}-live-${suffix}'
 var keyVaultName = 'kv-${namePrefix}-${suffix}'
@@ -32,6 +31,13 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
 resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
   parent: storageAccount
   name: 'default'
+  properties: {
+    staticWebsite: {
+      enabled: true
+      indexDocument: 'index.html'
+      error404Document: 'index.html'
+    }
+  }
 }
 
 resource deploymentContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
@@ -61,6 +67,18 @@ resource applicationInsights 'Microsoft.Insights/components@2020-02-02' = {
     Application_Type: 'web'
     DisableLocalAuth: true
     WorkspaceResourceId: logAnalytics.id
+  }
+}
+
+resource applicationInsightsBilling 'Microsoft.Insights/components/currentbillingfeatures@2015-05-01' = {
+  parent: applicationInsights
+  name: 'CurrentBillingFeatures'
+  properties: {
+    dataVolumeCap: {
+      cap: json('0.1')
+      stopSendNotificationWhenHitCap: true
+      stopSendNotificationWhenHitThreshold: true
+    }
   }
 }
 
@@ -102,7 +120,7 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
         version: '22'
       }
       scaleAndConcurrency: {
-        maximumInstanceCount: 20
+        maximumInstanceCount: 5
         instanceMemoryMB: 512
       }
     }
@@ -204,22 +222,10 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
   }
 }
 
-resource staticWebApp 'Microsoft.Web/staticSites@2023-12-01' = {
-  name: staticWebAppName
-  location: location
-  sku: {
-    name: 'Free'
-    tier: 'Free'
-  }
-  properties: {
-    stagingEnvironmentPolicy: 'Enabled'
-  }
-}
-
-output staticWebAppName string = staticWebApp.name
 output functionAppName string = functionApp.name
 output functionAppUrl string = 'https://${functionApp.properties.defaultHostName}'
 output cosmosAccountName string = cosmosAccount.name
 output webPubSubName string = webPubSub.name
 output keyVaultName string = keyVault.name
 output storageAccountName string = storageAccount.name
+output staticWebsiteEndpoint string = storageAccount.properties.primaryEndpoints.web

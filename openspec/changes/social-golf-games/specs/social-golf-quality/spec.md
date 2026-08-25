@@ -81,6 +81,10 @@ The first release SHALL use Azure Web PubSub Free tier for live participant upda
 the service to 20 concurrent participant connections. The system SHALL alert the operator before
 the connection cap is reached so the service can be upgraded to Standard tier.
 
+The system SHALL use Free, serverless, locally redundant, or minimum-instance Azure service tiers
+where they meet the approved requirements. Application Insights telemetry SHALL have a daily data
+ingestion cap.
+
 #### Scenario: Demand returns after an idle period
 
 - **GIVEN** the service has no active rounds and idle capacity has scaled to zero

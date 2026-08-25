@@ -18,13 +18,14 @@
 - [ ] 2.1 Create the Väyläkaverit iPhone-first PWA foundation, including installable web-app
       metadata, responsive mobile layout, environment configuration, and local development
       instructions.
-- [ ] 2.2 Define Azure infrastructure with Bicep: Azure Static Web Apps, Azure Functions Flex
+- [ ] 2.2 Define Azure infrastructure with Bicep: Azure Storage Static Website, Azure Functions Flex
       Consumption, Azure Cosmos DB serverless, Azure Web PubSub, Key Vault, and Application Insights /
       Azure Monitor. Verify regional availability, scale-to-zero behaviour, cold-start performance,
       telemetry privacy, and expected idle costs. Provision Web PubSub Free tier initially, restrict
       live connections to joined round participants, and create a documented alert and Standard-tier
       upgrade procedure before its 20-connection cap. Document the administrator-run harness script
-      that grants the Function App's managed identity its required Storage data-plane roles.
+      that grants the Function App's managed identity its required Storage data-plane roles. Encode
+      Free, serverless, LRS, minimum-instance, maximum-scale, and telemetry-cap cost guardrails.
 - [ ] 2.3 Create the Azure Functions API foundation with persistent storage, authenticated API
       boundaries, live round-update transport, managed-identity data access, and a deployment-safe
       configuration model.

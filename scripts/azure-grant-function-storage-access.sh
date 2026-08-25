@@ -7,14 +7,15 @@
 
 set -euo pipefail
 
-if [ "$#" -ne 3 ]; then
-  echo "Usage: $0 <resource-group> <function-app-name> <storage-account-name>" >&2
+if [ "$#" -ne 4 ]; then
+  echo "Usage: $0 <resource-group> <function-app-name> <storage-account-name> <github-actions-client-id>" >&2
   exit 1
 fi
 
 resource_group="$1"
 function_app_name="$2"
 storage_account_name="$3"
+github_actions_client_id="$4"
 
 function_principal_id="$(
   az functionapp identity show \
@@ -44,3 +45,9 @@ for role in "Storage Blob Data Owner" "Storage Queue Data Contributor" "Storage 
     --scope "$storage_scope" \
     --only-show-errors
 done
+
+az role assignment create \
+  --assignee "$github_actions_client_id" \
+  --role "Storage Blob Data Contributor" \
+  --scope "$storage_scope" \
+  --only-show-errors

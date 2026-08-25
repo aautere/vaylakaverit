@@ -1,13 +1,28 @@
 # Azure infrastructure
 
-`main.bicep` deploys environments into the shared CAF-named resource group `rg-vaylakaverit` and
-defines:
+`main.bicep` deploys environments into the shared CAF-named resource group `rg-vaylakaverit` in
+Sweden Central and defines:
 
-- Azure Static Web Apps for the PWA;
+- Azure Storage Static Website hosting for the PWA;
 - Azure Functions Flex Consumption for the API;
 - Azure Cosmos DB for NoSQL in serverless mode;
 - Azure Web PubSub Free tier for up to 20 live participant connections;
 - Key Vault, Application Insights, Log Analytics, and Functions backing storage.
+
+## Cost guardrails
+
+- The PWA is hosted by the Storage Static Website feature, with no separate Static Web Apps plan.
+- Web PubSub uses Free_F1, limited to 20 concurrent participant connections and 20,000 messages
+  per day.
+- Functions Flex Consumption uses the smallest 512 MB instance size, no always-ready instances,
+  and a maximum of five instances. It scales to zero while idle.
+- Cosmos DB uses serverless capacity with zone redundancy disabled.
+- Storage uses Standard locally redundant storage.
+- Application Insights is capped at 0.1 GB of ingestion per day. When the cap is reached,
+  telemetry collection stops until the next day.
+
+An Azure Budget alert is an additional notification guardrail; it does not stop resource usage or
+guarantee a hard spending limit.
 
 ## Deployment prerequisites
 
@@ -45,7 +60,7 @@ Provisioning creates billable Azure resources. After an explicit approval:
 ```bash
 az login
 az deployment sub create \
-  --location westeurope \
+  --location swedencentral \
   --template-file infra/main.bicep \
   --parameters environmentName=development
 ```

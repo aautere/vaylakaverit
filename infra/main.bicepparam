@@ -1,5 +1,5 @@
 using 'main.bicep'
 
 param environmentName = 'development'
-param location = 'westeurope'
+param location = 'swedencentral'
 param namePrefix = 'vaylakaverit'
