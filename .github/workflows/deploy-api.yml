@@ -35,7 +35,7 @@ jobs:
           pnpm --filter @vaylakaverit/api deploy --prod api-package
           (
             cd api-package
-            zip --quiet --recurse-paths ../api-package.zip .
+            zip --quiet --symlinks --recurse-paths ../api-package.zip .
           )
       - uses: azure/login@v2
         with:
