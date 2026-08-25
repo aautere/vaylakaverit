@@ -50,17 +50,20 @@ retrievable background values conflict with the club's published hole lengths. T
 length page is therefore the only recorded source for tee lengths; calculator background data is
 not adopted.
 
+The product owner transcribed the official 18-hole handicap-index sequence from eBirdie, Suomen
+Golfliitto's official mobile application, on 2026-08-25. The detailed record is in
+`course-data/rock-golf.md`.
+
 ## Blocking data gap
 
-Neither the club's published pages nor its linked calculator provides the official ordered
-handicap indexes required to allocate match-play handicap strokes. The calculator also does not
-provide a club-published, versioned playing-handicap lookup table or a stated effective date for
-its values.
+The official eBirdie transcription provides the 18-hole handicap indexes, but no verified source
+has yet supplied the 9-hole handicap indexes. The calculator also does not provide a
+club-published, versioned playing-handicap lookup table or a stated effective date for its values.
 
 Do not add Rock Golf to the selectable course registry or enable handicap match play until Rock Golf
 provides:
 
-1. the official ordered handicap indexes for holes 1 through 9;
+1. the official ordered handicap indexes for the 9-hole layout;
 2. confirmation of how the indexes apply when the nine-hole layout is played twice;
 3. the official men's and women's Course Rating and Slope Rating values for each tee and offered
    length;

@@ -64,7 +64,9 @@ history.
 
 For a Rock Golf 18-hole round, the system SHALL use the same configured nine-hole layout for round
 holes 1 through 9 and 10 through 18. It SHALL keep the two passes distinct through their round-hole
-number, while showing the underlying Rock Golf hole number and pass where context is needed.
+number, while showing the underlying Rock Golf hole number and pass where context is needed. The
+system MUST use the selected layout's official round-hole handicap indexes and MUST NOT assume that
+the second pass repeats the first pass's handicap indexes.
 
 The system SHALL prevent a score, side game, or end-tie extension from referring to a round hole
 outside the selected round length. An unresolved game that reaches the final round hole without a
@@ -76,6 +78,13 @@ winner SHALL retain the existing unresolved outcome.
 - **WHEN** a participant records their own score
 - **THEN** the system records it against round hole 12
 - **AND** presents it as the second pass of underlying Rock Golf hole 3
+
+#### Scenario: A second-pass hole uses its official handicap index
+
+- **GIVEN** an active Rock Golf 18-hole round has reached round hole 12
+- **WHEN** the system evaluates a handicap game
+- **THEN** it uses the official handicap index 8 recorded for round hole 12
+- **AND** it does not reuse the handicap index from round hole 3
 
 #### Scenario: A 9-hole game cannot extend past the round
 

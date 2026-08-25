@@ -46,9 +46,10 @@ course update must not silently change historical scorecards or results.
 ### Rock Golf two-pass layout
 
 The Rock Golf course configuration has a nine-hole layout and an 18-hole layout. The 18-hole layout
-contains two ordered passes of the same source-hole definitions: source holes 1–9 map to round
-holes 1–9 in pass one and to round holes 10–18 in pass two. Round-hole numbers are the score and
-game keys; source-hole number and pass are display context.
+contains two ordered passes of the same physical source-hole definitions: source holes 1–9 map to
+round holes 1–9 in pass one and to round holes 10–18 in pass two. Course configuration separates
+the repeated physical hole data from the official layout-specific round-hole handicap indexes.
+Round-hole numbers are the score and game keys; source-hole number and pass are display context.
 
 This is preferred to duplicating Rock Golf as separate front-nine and back-nine courses, which
 would obscure a single round and complicate invitations, games, and history.
@@ -106,9 +107,8 @@ from old clients and invitation holders.
 
 - Rock Golf's official site confirms its nine-hole par-3 layout, tee labels, tee lengths, and that
   18 holes are played as two nine-hole rounds. As recorded in
-  `rock-golf-source-verification.md`, neither the site nor its linked calculator provides the
-  required hole-handicap indexes, rating/slope tables, or a versioned playing-handicap lookup table.
-  Rock Golf must publish or confirm those values, including their effective date, before enabling
-  the configuration.
+  `course-data/rock-golf.md`, eBirdie provides the official 18-hole handicap-index sequence.
+  Rock Golf must still publish or confirm the 9-hole handicap indexes, rating/slope tables,
+  playing-handicap lookup data, and their effective date before enabling the configuration.
 - Confirm whether the official source designates a preferred default tee for Rock Golf; otherwise
   the product owner must choose one explicitly before implementation.
