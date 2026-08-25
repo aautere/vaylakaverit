@@ -133,6 +133,7 @@ resource functionAppSettings 'Microsoft.Web/sites/config@2024-04-01' = {
     AzureWebJobsStorage__blobServiceUri: storageAccount.properties.primaryEndpoints.blob
     AzureWebJobsStorage__queueServiceUri: storageAccount.properties.primaryEndpoints.queue
     AzureWebJobsStorage__tableServiceUri: storageAccount.properties.primaryEndpoints.table
+    FUNCTIONS_WORKER_RUNTIME: 'node'
     APPLICATIONINSIGHTS_CONNECTION_STRING: applicationInsights.properties.ConnectionString
     APPLICATIONINSIGHTS_AUTHENTICATION_STRING: 'Authorization=AAD'
     AUTH_MODE: isProduction ? 'apple' : 'preview'
