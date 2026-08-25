@@ -11,7 +11,7 @@
 | --- | --- | --- | --- | --- | --- |
 | Rockin väylien pituudet | Rock Golf | https://rockgolf.fi/rockin-vaylapituudet/ | 2026-08-25 | Not stated | Nine-hole tee labels, per-hole lengths, and all-par-3 course description. |
 | Q&A | Rock Golf | https://rockgolf.fi/q-a/ | 2026-08-25 | Not stated | An 18-hole round is two booked nine-hole rounds. |
-| eBirdie mobile application | Suomen Golfliitto | https://golf.fi/pelaajalle/ebirdie/ | 2026-08-25 | Not stated | Official 18-hole scorecard handicap indexes, transcribed by the product owner; its first pass is the confirmed 9-hole sequence. |
+| eBirdie mobile application | Suomen Golfliitto | https://golf.fi/pelaajalle/ebirdie/ | 2026-08-25 | Not stated | Official 18-hole scorecard handicap indexes, transcribed by the product owner; its first pass is the confirmed 9-hole sequence and each second-pass index is first-pass index plus one. |
 
 ## Layouts and tees
 
@@ -56,7 +56,8 @@
 | 18 holes | 18 | 9 | 2 | 3 | 10 | R 162, O 134, C 127, K 110 | Rock Golf / eBirdie |
 
 The product owner confirmed that the official 9-hole scorecard uses the first-pass sequence from
-the eBirdie 18-hole card. The second pass uses its separately published indexes.
+the eBirdie 18-hole card. For every source hole, the second-pass index is the corresponding
+first-pass index plus one: 5/6, 11/12, 7/8, 15/16, 17/18, 1/2, 13/14, 3/4, and 9/10.
 
 ## Playing-handicap data
 
@@ -68,7 +69,8 @@ Rating and Slope Rating values are also missing for both rating tables and both 
 - Total par: 9 holes are nine par-3 holes (27); the confirmed two-pass 18-hole layout totals 54.
 - Tee-distance totals: recorded 9-hole totals equal the sum of the official per-hole lengths.
 - Handicap-index ordering and completeness: the eBirdie 18-hole transcription contains every index
-  from 1 through 18 exactly once. The 9-hole layout uses its first-pass values.
+  from 1 through 18 exactly once. The 9-hole layout uses the odd first-pass values; every
+  second-pass value is its matching first-pass value plus one.
 - Layout mapping: Rock Golf confirms that 18 holes are played as two nine-hole rounds.
 - Historical versioning/effective date: missing from all retrieved sources.
 

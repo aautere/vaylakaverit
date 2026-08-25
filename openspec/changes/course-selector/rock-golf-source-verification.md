@@ -52,8 +52,8 @@ not adopted.
 
 The product owner transcribed the official 18-hole handicap-index sequence from eBirdie, Suomen
 Golfliitto's official mobile application, on 2026-08-25. The product owner confirmed that the
-official 9-hole sequence is the 18-hole card's first-pass values. The detailed record is in
-`course-data/rock-golf.md`.
+official 9-hole sequence is the 18-hole card's first-pass values and that each second-pass index
+is its first-pass counterpart plus one. The detailed record is in `course-data/rock-golf.md`.
 
 ## Blocking data gap
 

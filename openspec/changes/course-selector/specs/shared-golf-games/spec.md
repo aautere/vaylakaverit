@@ -84,7 +84,7 @@ winner SHALL retain the existing unresolved outcome.
 - **GIVEN** an active Rock Golf 18-hole round has reached round hole 12
 - **WHEN** the system evaluates a handicap game
 - **THEN** it uses the official handicap index 8 recorded for round hole 12
-- **AND** it does not reuse the handicap index from round hole 3
+- **AND** that index is one greater than the handicap index 7 on the first-pass round hole 3
 
 #### Scenario: A 9-hole round uses the first-pass handicap indexes
 
