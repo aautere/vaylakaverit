@@ -77,7 +77,9 @@ The backend exposes a small round-scoped API:
 
 - create a round and its initial players;
 - issue and consume an opaque QR invitation;
-- set player profile, tee, and handicap index;
+- hold a pre-play lobby where each participant confirms their own name, tee, handicap index, and
+  rating table;
+- start a ready two-to-four-player lobby as the round creator;
 - create and configure games;
 - enter or correct a player's own score;
 - read live round state and completed history.
@@ -85,6 +87,14 @@ The backend exposes a small round-scoped API:
 Each score mutation is authorized against the participant identity, persisted, evaluated by the
 game engine, and published as a round update. This makes corrections deterministic and ensures a
 reconnecting phone receives the same result as the phones that stayed connected.
+
+New rounds are persisted in a `lobby` state. A lobby records its creator and a readiness flag for
+each player. Changing a player's own required settings clears that flag unless the same mutation
+explicitly reconfirms readiness. The server alone transitions a round from `lobby` to `active`,
+after verifying that the creator made the request, the group has two to four ready players, and
+the main game settings are valid. Score and side-game writes are rejected before that transition.
+Both the in-memory preview store and Cosmos store preserve this state and use the same domain
+validation.
 
 ### Source control and delivery
 

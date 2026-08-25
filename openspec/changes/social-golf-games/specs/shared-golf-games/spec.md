@@ -29,6 +29,45 @@ its history without permission to alter player scores.
 - **AND** explains that the round already has the maximum number of players
 - **AND** allows the recipient to view the round without joining it
 
+### Requirement: Shared round lobby and readiness
+
+The system SHALL place a newly created shared round in a lobby before active play. The lobby SHALL
+show every participant's name, selected tee, Handicap Index, selected rating table, looked-up
+playing handicap, readiness, and the configured main-game settings.
+
+Each participant SHALL be able to update and confirm only their own name, tee, Handicap Index, and
+rating table while the round is in the lobby. Updating any of those settings SHALL require that
+participant to confirm readiness again. The backend MUST reject an attempt to change another
+participant's settings.
+
+Only the round creator SHALL be allowed to start the round. The system SHALL allow starting only
+when the lobby has two to four participants, every participant has valid required settings and has
+confirmed readiness, and the main game has valid settings. The backend MUST enforce these
+conditions and reject score or side-game mutations before the round starts.
+
+#### Scenario: Players confirm lobby settings
+
+- **GIVEN** a creator has opened a new shared-round lobby
+- **WHEN** each participant selects their own tee, Handicap Index, rating table, and confirms their
+  settings
+- **THEN** every participant sees the roster with each player's looked-up playing handicap and
+  readiness
+- **AND** no participant can change another participant's settings
+
+#### Scenario: Creator starts a ready group
+
+- **GIVEN** a lobby contains two to four ready participants with valid required settings
+- **WHEN** the creator starts the round
+- **THEN** the system changes the round to active play
+- **AND** participants can enter scores and create side games
+
+#### Scenario: Starting is blocked while the lobby is incomplete
+
+- **GIVEN** a lobby has fewer than two participants or a participant has not confirmed valid settings
+- **WHEN** the creator tries to start the round
+- **THEN** the system refuses the request
+- **AND** explains that the roster and settings must be ready first
+
 ### Requirement: Player score entry and correction
 
 The system SHALL let each participant enter and later correct only their own stroke count for each
