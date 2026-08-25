@@ -15,13 +15,13 @@ so two equal display names remain separately authorized.
 
 ## Session lifecycle and data clearing
 
-| Event | Required behavior |
-| --- | --- |
-| Create or restore | A valid browser credential restores the same guest on that browser profile only. No sign-in screen is shown. |
-| Inactivity | The service expires a guest session after 180 days since its most recent authenticated use. The next request removes the stale local credential and returns the browser to name entry. |
-| Clear device data | The user explicitly chooses **Clear data on this device**. The service revokes the current device credential and the browser deletes it and all pending-score outbox items. Shared-round records, scores, and results remain unchanged; the browser no longer has access to previous rounds. |
-| Browser/app storage cleared | This has the same access outcome as clear-device-data when the credential becomes unavailable. It cannot recover the previous guest or its history. |
-| Delete guest data | The existing destructive deletion flow derives the current guest from its credential, anonymizes that guest in shared rounds, revokes the credential, and clears local data. It is irreversible. |
+| Event                       | Required behavior                                                                                                                                                                                                                                                                            |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Create or restore           | A valid browser credential restores the same guest on that browser profile only. No sign-in screen is shown.                                                                                                                                                                                 |
+| Inactivity                  | The service expires a guest session after 180 days since its most recent authenticated use. The next request removes the stale local credential and returns the browser to name entry.                                                                                                       |
+| Clear device data           | The user explicitly chooses **Clear data on this device**. The service revokes the current device credential and the browser deletes it and all pending-score outbox items. Shared-round records, scores, and results remain unchanged; the browser no longer has access to previous rounds. |
+| Browser/app storage cleared | This has the same access outcome as clear-device-data when the credential becomes unavailable. It cannot recover the previous guest or its history.                                                                                                                                          |
+| Delete guest data           | The existing destructive deletion flow derives the current guest from its credential, anonymizes that guest in shared rounds, revokes the credential, and clears local data. It is irreversible.                                                                                             |
 
 The 180-day sliding lifetime balances a completed-round review period with an explicit limit on
 unclaimed guest identity. Clearing local browser data cannot reliably notify the service, so expired

@@ -19,14 +19,14 @@ on hover; QR scanning always has a visible paste/copy-link alternative.
 
 ## Foundation and state treatment
 
-| Area | Primitive or semantic treatment | Required presentation |
-| --- | --- | --- |
-| Start, create, join, and confirmation | `Card`, `TextField`, `Action` | Task heading, named field/help, primary submit, and secondary return path. |
-| Guest/session explanation | `StatusMessage` information treatment | Plain text that this browser stores the guest session; no account icon or account language. |
-| Invalid name/link and denied access | Inline field error plus assertive `StatusMessage` | Preserve input where safe and show a specific next action. |
-| Busy/expired/offline | `StatusMessage` and disabled busy `Action` | Keep current context; expired state returns to name entry. |
-| Clear device | Secondary/destructive-adjacent action with confirmation dialog | Explain that shared records remain but this browser loses access. |
-| Delete guest data | Strong destructive action with confirmation dialog | State irreversibility and shared-history anonymization. |
+| Area                                  | Primitive or semantic treatment                                | Required presentation                                                                       |
+| ------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Start, create, join, and confirmation | `Card`, `TextField`, `Action`                                  | Task heading, named field/help, primary submit, and secondary return path.                  |
+| Guest/session explanation             | `StatusMessage` information treatment                          | Plain text that this browser stores the guest session; no account icon or account language. |
+| Invalid name/link and denied access   | Inline field error plus assertive `StatusMessage`              | Preserve input where safe and show a specific next action.                                  |
+| Busy/expired/offline                  | `StatusMessage` and disabled busy `Action`                     | Keep current context; expired state returns to name entry.                                  |
+| Clear device                          | Secondary/destructive-adjacent action with confirmation dialog | Explain that shared records remain but this browser loses access.                           |
+| Delete guest data                     | Strong destructive action with confirmation dialog             | State irreversibility and shared-history anonymization.                                     |
 
 Use existing semantic surface, text, border, action, status, spacing, focus, and disabled tokens
 and the existing accessible primitives. No new foundation component or token is requested.

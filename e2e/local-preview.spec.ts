@@ -86,17 +86,34 @@ test('two iPhone-sized participants join locally, settle a side-game tie, correc
   }
 });
 
-test('a local guest can confirm deletion of their data', async ({ page }) => {
+test('a local guest can clear device data or delete shared guest data', async ({ page }) => {
   await page.goto('/');
   await page.locator('#player-name').fill('Poistettava pelaaja');
   await page.getByRole('button', { name: 'Luo kierros' }).click();
   await expect(page.getByRole('heading', { name: 'Kierroksen aula' })).toBeVisible();
 
   page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: 'Poista tietoni' }).click();
-
-  await expect(page.getByRole('status')).toContainText('Tietosi on poistettu');
+  await page.getByRole('button', { name: 'Tyhjennä tämän laitteen tiedot' }).click();
+  await expect(page.getByRole('status')).toContainText('Tämän laitteen vierastiedot tyhjennettiin');
   await expect(page.getByRole('heading', { name: 'Pelaa kierros yhdessä.' })).toBeVisible();
+
+  await page.locator('#player-name').fill('Poistettava pelaaja');
+  await page.getByRole('button', { name: 'Luo kierros' }).click();
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Poista vierastietoni' }).click();
+
+  await expect(page.getByRole('status')).toContainText('Vierastietosi poistettiin');
+  await expect(page.getByRole('heading', { name: 'Pelaa kierros yhdessä.' })).toBeVisible();
+});
+
+test('keyboard creation moves focus to the guest lobby heading', async ({ page }) => {
+  await page.goto('/');
+  await page.keyboard.press('Tab');
+  await expect(page.locator('#player-name')).toBeFocused();
+  await page.locator('#player-name').fill('Näppäinpelaaja');
+  await page.keyboard.press('Enter');
+
+  await expect(page.getByRole('heading', { name: 'Kierroksen aula' })).toBeFocused();
 });
 
 test('a creator can revoke a local invitation so its link no longer opens', async ({ browser }) => {

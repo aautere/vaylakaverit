@@ -26,7 +26,9 @@ Delete this comment when completing the proposal.
 ## Non-goals
 
 <!-- Name intentionally excluded work so the scope remains clear. -->
+
 ---
+
 scope: application
 status: approved
 ---
