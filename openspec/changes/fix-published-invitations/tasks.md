@@ -6,7 +6,7 @@
       retaining device-local guest identities; retain local in-memory preview behaviour.
 - [x] 3. Add durable-store API integration coverage for a creator and a separate guest joining the
       same unstarted invitation across an API-instance boundary.
-- [ ] 4. Update the invitation loading, unavailable-link, offline, and join-conflict UI feedback to
+- [x] 4. Update the invitation loading, unavailable-link, offline, and join-conflict UI feedback to
       match the approved UX and Finnish copy records, with targeted UI tests.
 - [ ] 5. Document the distinction between local preview and shared public-development testing, then
       run the relevant formatting, type, unit, integration, and OpenSpec validation.
