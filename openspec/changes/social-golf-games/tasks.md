@@ -23,7 +23,8 @@
       Azure Monitor. Verify regional availability, scale-to-zero behaviour, cold-start performance,
       telemetry privacy, and expected idle costs. Provision Web PubSub Free tier initially, restrict
       live connections to joined round participants, and create a documented alert and Standard-tier
-      upgrade procedure before its 20-connection cap.
+      upgrade procedure before its 20-connection cap. Document the administrator-run harness script
+      that grants the Function App's managed identity its required Storage data-plane roles.
 - [ ] 2.3 Create the Azure Functions API foundation with persistent storage, authenticated API
       boundaries, live round-update transport, managed-identity data access, and a deployment-safe
       configuration model.

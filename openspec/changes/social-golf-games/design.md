@@ -95,6 +95,11 @@ Azure roles. No long-lived Azure credentials are stored in GitHub. Development a
 separate Azure resource groups and application configuration. Production deployment requires an
 explicit approval step.
 
+The GitHub deployment identity has Contributor access only. The Bicep deployment deliberately does
+not create Azure RBAC role assignments. After provisioning, an Azure RBAC administrator runs the
+repository's `azure-grant-function-storage-access.sh` harness script to assign the Function App's
+managed identity the three required Storage data-plane roles on its backing account.
+
 ## Identity and access
 
 Apple sign-in produces a persistent account for a player and unlocks their cross-device history.

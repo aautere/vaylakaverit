@@ -215,54 +215,10 @@ resource staticWebApp 'Microsoft.Web/staticSites@2023-12-01' = {
   }
 }
 
-var roleDefinitionIds = {
-  storageBlobDataOwner: subscriptionResourceId(
-    'Microsoft.Authorization/roleDefinitions',
-    'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
-  )
-  storageQueueDataContributor: subscriptionResourceId(
-    'Microsoft.Authorization/roleDefinitions',
-    '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
-  )
-  storageTableDataContributor: subscriptionResourceId(
-    'Microsoft.Authorization/roleDefinitions',
-    '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
-  )
-}
-
-resource storageBlobRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(storageAccount.id, functionApp.id, roleDefinitionIds.storageBlobDataOwner)
-  scope: storageAccount
-  properties: {
-    principalId: functionApp.identity.principalId
-    principalType: 'ServicePrincipal'
-    roleDefinitionId: roleDefinitionIds.storageBlobDataOwner
-  }
-}
-
-resource storageQueueRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(storageAccount.id, functionApp.id, roleDefinitionIds.storageQueueDataContributor)
-  scope: storageAccount
-  properties: {
-    principalId: functionApp.identity.principalId
-    principalType: 'ServicePrincipal'
-    roleDefinitionId: roleDefinitionIds.storageQueueDataContributor
-  }
-}
-
-resource storageTableRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(storageAccount.id, functionApp.id, roleDefinitionIds.storageTableDataContributor)
-  scope: storageAccount
-  properties: {
-    principalId: functionApp.identity.principalId
-    principalType: 'ServicePrincipal'
-    roleDefinitionId: roleDefinitionIds.storageTableDataContributor
-  }
-}
-
 output staticWebAppName string = staticWebApp.name
 output functionAppName string = functionApp.name
 output functionAppUrl string = 'https://${functionApp.properties.defaultHostName}'
 output cosmosAccountName string = cosmosAccount.name
 output webPubSubName string = webPubSub.name
 output keyVaultName string = keyVault.name
+output storageAccountName string = storageAccount.name
