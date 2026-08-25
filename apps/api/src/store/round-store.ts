@@ -47,6 +47,8 @@ export type Round = {
   courseName: string;
   joinLink: string;
   invitationToken: string;
+  invitationExpiresAt: string;
+  invitationRevokedAt?: string;
   state: RoundState;
   creatorIdentityId?: string;
   players: RoundPlayer[];
@@ -77,6 +79,7 @@ export type CreateRoundInput = {
 
 export type JoinRoundInput = {
   roundId: string;
+  invitationToken: string;
   identityId: string;
   name: string;
   handicapIndex: number;
@@ -116,6 +119,11 @@ export type AddSideGameInput = {
   endTieRule?: EndTieRule;
 };
 
+export type RevokeInvitationInput = {
+  roundId: string;
+  creatorIdentityId: string;
+};
+
 export type DeleteIdentityResult = {
   anonymizedRoundCount: number;
 };
@@ -130,6 +138,7 @@ export interface RoundStore {
   create(input: CreateRoundInput): MaybePromise<Round>;
   get(roundId: string): MaybePromise<Round | undefined>;
   getByInvitationToken(invitationToken: string): MaybePromise<Round | undefined>;
+  revokeInvitation(input: RevokeInvitationInput): MaybePromise<Round | undefined>;
   join(input: JoinRoundInput): MaybePromise<Round | undefined>;
   updatePlayer(input: UpdateRoundPlayerInput): MaybePromise<Round | undefined>;
   start(roundId: string): MaybePromise<Round | undefined>;
@@ -141,7 +150,9 @@ export interface RoundStore {
   deleteIdentity(identityId: string): MaybePromise<DeleteIdentityResult>;
 }
 
-export function createRound(input: CreateRoundInput): Round {
+export const invitationLifetimeMilliseconds = 24 * 60 * 60 * 1000;
+
+export function createRound(input: CreateRoundInput, now = new Date()): Round {
   const id = randomUUID();
   const invitationToken = randomBytes(32).toString('base64url');
   const player = createPlayer(
@@ -167,6 +178,7 @@ export function createRound(input: CreateRoundInput): Round {
     courseName: talmaMaster.name,
     joinLink: `/?join=${invitationToken}`,
     invitationToken,
+    invitationExpiresAt: new Date(now.getTime() + invitationLifetimeMilliseconds).toISOString(),
     state: 'lobby',
     creatorIdentityId: input.identityId,
     players: [player],
@@ -180,9 +192,39 @@ export function createRound(input: CreateRoundInput): Round {
   return round;
 }
 
+export function isInvitationValid(
+  round: Pick<Round, 'invitationExpiresAt' | 'invitationRevokedAt'>,
+  now = new Date(),
+): boolean {
+  return (
+    !round.invitationRevokedAt &&
+    Number.isFinite(Date.parse(round.invitationExpiresAt)) &&
+    Date.parse(round.invitationExpiresAt) > now.getTime()
+  );
+}
+
+export function revokeInvitation(
+  round: Round,
+  input: RevokeInvitationInput,
+  now = new Date(),
+): Round | undefined {
+  if (
+    round.id !== input.roundId ||
+    round.creatorIdentityId !== input.creatorIdentityId ||
+    !isInvitationValid(round, now)
+  ) {
+    return undefined;
+  }
+
+  round.invitationRevokedAt = now.toISOString();
+  return round;
+}
+
 export function joinRound(round: Round, input: JoinRoundInput): Round | undefined {
   if (
     round.state !== 'lobby' ||
+    round.invitationToken !== input.invitationToken ||
+    !isInvitationValid(round) ||
     !input.name ||
     round.players.length >= 4 ||
     round.players.some((player) => player.identityId === input.identityId)

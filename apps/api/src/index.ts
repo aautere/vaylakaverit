@@ -226,9 +226,10 @@ export async function joinPreviewRoundHandler(request: HttpRequest): Promise<Htt
   }
 
   const invitationToken = request.params.invitationToken;
-  const invitedRound = invitationToken
-    ? await roundStore.getByInvitationToken(invitationToken)
-    : undefined;
+  if (!invitationToken) {
+    return json({ error: 'Kutsulinkki ei ole voimassa tai kierros on päättynyt.' }, 404);
+  }
+  const invitedRound = await roundStore.getByInvitationToken(invitationToken);
   if (!invitedRound) {
     return json({ error: 'Kutsulinkki ei ole voimassa tai kierros on päättynyt.' }, 404);
   }
@@ -242,6 +243,7 @@ export async function joinPreviewRoundHandler(request: HttpRequest): Promise<Htt
   try {
     round = await roundStore.join({
       roundId: invitedRound.id,
+      invitationToken,
       identityId: session.subject,
       name: name.trim(),
       handicapIndex,
@@ -253,11 +255,53 @@ export async function joinPreviewRoundHandler(request: HttpRequest): Promise<Htt
   }
 
   if (!round) {
+    const currentInvitation = await roundStore.getByInvitationToken(invitationToken);
+    if (!currentInvitation) {
+      return json({ error: 'Kutsulinkki ei ole enää voimassa.' }, 404);
+    }
+    if (currentInvitation.players.length >= 4) {
+      return json(
+        { error: 'Kierros on täynnä. Voit silti katsella kierrosta kutsulinkillä.' },
+        409,
+      );
+    }
     return json({ error: 'Kierrokseen ei voi liittyä.' }, 400);
   }
 
   await publishRoundUpdate(round.id);
   return json(round);
+}
+
+app.http('revokePreviewInvitation', {
+  methods: ['POST'],
+  authLevel: 'anonymous',
+  route: 'preview/rounds/{roundId}/invitation/revoke',
+  handler: revokePreviewInvitationHandler,
+});
+
+export async function revokePreviewInvitationHandler(
+  request: HttpRequest,
+): Promise<HttpResponseInit> {
+  const session = identityService.sessionFromRequest(request);
+  if (!session) {
+    return json({ error: 'Tunnistautuminen vaaditaan.' }, 401);
+  }
+
+  const roundId = request.params.roundId;
+  if (!roundId) {
+    return json({ error: 'Kierrosta ei löytynyt.' }, 404);
+  }
+
+  const revokedRound = await roundStore.revokeInvitation({
+    roundId,
+    creatorIdentityId: session.subject,
+  });
+  if (!revokedRound) {
+    return json({ error: 'Vain kierroksen luoja voi mitätöidä voimassa olevan kutsulinkin.' }, 403);
+  }
+
+  await publishRoundUpdate(revokedRound.id);
+  return json(revokedRound);
 }
 
 app.http('updatePreviewRoundPlayer', {

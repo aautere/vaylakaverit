@@ -78,7 +78,7 @@
 
 - [x] 6.1 Add unit tests for course configuration, playing-handicap calculation, scratch and
       handicap outcomes, all tie rules, multi-player outcomes, and score corrections.
-- [ ] 6.2 Add integration tests for QR joining, player limits, score authorization, invitation
+- [x] 6.2 Add integration tests for QR joining, player limits, score authorization, invitation
       expiry, persistence, real-time updates, and reconnection.
 - [ ] 6.3 Exercise a two-to-four player round on iPhone-sized Safari viewports, including PWA
       installation, local-link joining in preview mode, a side game, score correction, tie handling,

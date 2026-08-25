@@ -3,7 +3,9 @@ import {
   anonymizeIdentity,
   createRound,
   finishRound,
+  isInvitationValid,
   joinRound,
+  revokeInvitation,
   scoreRound,
   type AddSideGameInput,
   type CompletedRound,
@@ -15,6 +17,7 @@ import {
   type JoinRoundInput,
   type Round,
   type RoundStore,
+  type RevokeInvitationInput,
   type ScoreRoundInput,
   type UpdateRoundPlayerInput,
   startRound,
@@ -42,7 +45,14 @@ export class PreviewRoundStore implements RoundStore {
   }
 
   public getByInvitationToken(invitationToken: string): Round | undefined {
-    return [...this.rounds.values()].find((round) => round.invitationToken === invitationToken);
+    return [...this.rounds.values()].find(
+      (round) => round.invitationToken === invitationToken && isInvitationValid(round),
+    );
+  }
+
+  public revokeInvitation(input: RevokeInvitationInput): Round | undefined {
+    const round = this.rounds.get(input.roundId);
+    return round ? revokeInvitation(round, input) : undefined;
   }
 
   public join(input: JoinRoundInput): Round | undefined {
@@ -158,6 +168,7 @@ export function joinPreviewRound(
 ): PreviewRound | undefined {
   return previewRoundStore.join({
     roundId,
+    invitationToken: previewRoundStore.get(roundId)?.invitationToken ?? '',
     identityId,
     name,
     handicapIndex,

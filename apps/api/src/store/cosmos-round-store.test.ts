@@ -50,6 +50,7 @@ describe('CosmosRoundStore', () => {
     });
     const joinedRound = await store.join({
       roundId: round.id,
+      invitationToken: round.invitationToken,
       identityId: 'guest:elli',
       name: 'Elli',
       handicapIndex: 18,
@@ -114,6 +115,30 @@ describe('CosmosRoundStore', () => {
     expect(await store.get(round.id)).toEqual(round);
   });
 
+  it('persists a creator revocation and excludes the revoked invitation from lookup', async () => {
+    const store = new CosmosRoundStore(createContainerMock());
+    const round = await store.create({
+      identityId: 'guest:aino',
+      name: 'Aino',
+      handicapIndex: 18,
+      mode: 'scratch',
+      reward: '',
+    });
+
+    const revoked = await store.revokeInvitation({
+      roundId: round.id,
+      creatorIdentityId: 'guest:aino',
+    });
+
+    expect(revoked?.invitationRevokedAt).toEqual(expect.any(String));
+    expect(await store.getByInvitationToken(round.invitationToken)).toBeUndefined();
+    expect(await store.get(round.id)).toMatchObject({
+      invitationToken: round.invitationToken,
+      invitationExpiresAt: expect.any(String),
+      invitationRevokedAt: expect.any(String),
+    });
+  });
+
   it('persists lobby readiness and starts only a ready two-player round', async () => {
     const store = new CosmosRoundStore(createContainerMock());
     const round = await store.create({
@@ -127,6 +152,7 @@ describe('CosmosRoundStore', () => {
     expect(await store.start(round.id)).toBeUndefined();
     const joined = await store.join({
       roundId: round.id,
+      invitationToken: round.invitationToken,
       identityId: 'guest:elli',
       name: 'Elli',
       handicapIndex: 18,
@@ -162,6 +188,7 @@ describe('CosmosRoundStore', () => {
     });
     const joinedRound = await store.join({
       roundId: round.id,
+      invitationToken: round.invitationToken,
       identityId: 'guest:elli',
       name: 'Elli',
       handicapIndex: 18,
@@ -227,6 +254,7 @@ describe('CosmosRoundStore', () => {
     });
     const elli = (await store.join({
       roundId: completedRound.id,
+      invitationToken: completedRound.invitationToken,
       identityId: 'guest:elli',
       name: 'Elli',
       handicapIndex: 18,

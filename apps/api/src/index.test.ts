@@ -10,6 +10,7 @@ import {
   joinPreviewRoundHandler,
   listCompletedPreviewRoundsHandler,
   recordPreviewScoreHandler,
+  revokePreviewInvitationHandler,
   startPreviewRoundHandler,
   updatePreviewRoundPlayerHandler,
 } from './index.js';
@@ -165,6 +166,54 @@ describe('completed round history API', () => {
       expect(blockedCompletion.status).toBe(403);
       expect(joinedRound.status).toBe(200);
       expect(acceptedScore.status).toBe(400);
+    });
+
+    it('rejects expired invitations for both viewing and joining', async () => {
+      const round = createPreviewRound('Aino', 18, 'scratch', '', 'guest:expired-aino');
+      round.invitationExpiresAt = new Date(Date.now() - 1_000).toISOString();
+      const invitationRequest = {
+        params: { invitationToken: round.invitationToken },
+        headers: new Headers({ 'x-preview-guest-id': 'expired-viewer' }),
+      } as unknown as HttpRequest;
+      const joinRequest = {
+        ...invitationRequest,
+        json: async () => ({ name: 'Veera', handicapIndex: 18 }),
+      } as unknown as HttpRequest;
+
+      const view = await getPreviewInvitationHandler(invitationRequest);
+      const join = await joinPreviewRoundHandler(joinRequest);
+
+      expect(view).toMatchObject({ status: 404 });
+      expect(join).toMatchObject({ status: 404 });
+      expect(round.players).toHaveLength(1);
+    });
+
+    it('lets only the creator revoke an invitation and blocks the old link afterwards', async () => {
+      const round = createPreviewRound('Aino', 18, 'scratch', '', 'guest:revoke-aino');
+      const creatorRequest = requestFor(round.id, 'revoke-aino');
+      const otherRequest = requestFor(round.id, 'revoke-elli');
+      const invitationRequest = {
+        params: { invitationToken: round.invitationToken },
+        headers: new Headers({ 'x-preview-guest-id': 'revoke-viewer' }),
+      } as unknown as HttpRequest;
+      const joinRequest = {
+        ...invitationRequest,
+        json: async () => ({ name: 'Veera', handicapIndex: 18 }),
+      } as unknown as HttpRequest;
+
+      const denied = await revokePreviewInvitationHandler(otherRequest);
+      const revoked = await revokePreviewInvitationHandler(creatorRequest);
+      const view = await getPreviewInvitationHandler(invitationRequest);
+      const join = await joinPreviewRoundHandler(joinRequest);
+
+      expect(denied).toMatchObject({ status: 403 });
+      expect(revoked).toMatchObject({
+        status: 200,
+        jsonBody: { invitationRevokedAt: expect.any(String) },
+      });
+      expect(view).toMatchObject({ status: 404 });
+      expect(join).toMatchObject({ status: 404 });
+      expect(round.players).toHaveLength(1);
     });
 
     it('prevents one participant from recording another participant’s score', async () => {
@@ -329,8 +378,10 @@ describe('completed round history API', () => {
 
         expect(round.players).toHaveLength(4);
         expect(rejected).toMatchObject({
-          status: 400,
-          jsonBody: { error: 'Kierrokseen ei voi liittyä.' },
+          status: 409,
+          jsonBody: {
+            error: 'Kierros on täynnä. Voit silti katsella kierrosta kutsulinkillä.',
+          },
         });
       });
     });

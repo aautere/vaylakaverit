@@ -123,10 +123,11 @@ A guest receives a limited, device-bound session that can join a round by QR cod
 only their own scores. The final implementation must define whether and how a guest can later
 claim their history after creating an Apple account.
 
-The QR code contains an opaque, high-entropy sharing URL or token. Its bearer may view the shared
-round and history, but cannot alter scores. The round owner must be able to revoke or replace the
-token. The backend enforces the two-to-four player limit and authorizes every score mutation
-rather than trusting the client.
+The QR code contains an opaque 256-bit sharing token. It expires 24 hours after issuance, and the
+creator can revoke it earlier. Public invitation lookup and joining accept a token only while it is
+both unexpired and unrevoked; its bearer may view the shared round but cannot alter scores or obtain
+a live participant connection. The backend enforces the two-to-four player limit and authorizes
+every score mutation rather than trusting the client.
 
 ## Data model
 

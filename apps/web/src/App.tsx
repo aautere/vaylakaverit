@@ -53,6 +53,8 @@ type PreviewRound = {
   courseName: string;
   joinLink: string;
   invitationToken: string;
+  invitationExpiresAt: string;
+  invitationRevokedAt?: string;
   state: 'lobby' | 'active';
   creatorIdentityId?: string;
   players: PreviewPlayer[];
@@ -239,6 +241,10 @@ function App() {
   const replayInProgress = useRef(false);
 
   const joinUrl = round ? new URL(round.joinLink, window.location.origin).toString() : '';
+  const canShareInvitation = round ? isInvitationValid(round) : false;
+  const isRoundCreator =
+    round?.players.find((player) => player.id === activePlayerId)?.identityId ===
+    round?.creatorIdentityId;
 
   useEffect(() => {
     let active = true;
@@ -708,12 +714,31 @@ function App() {
   }
 
   async function copyJoinLink() {
-    if (!round) {
+    if (!round || !canShareInvitation) {
       return;
     }
 
     await navigator.clipboard.writeText(joinUrl);
     setCopied(true);
+  }
+
+  async function revokeInvitation() {
+    if (!round) {
+      return;
+    }
+
+    setError(null);
+    try {
+      setRound(
+        await request<PreviewRound>(`/api/preview/rounds/${round.id}/invitation/revoke`, {}),
+      );
+      setCopied(false);
+      setNotice('Kutsulinkki on mitätöity. Vanhaa QR-koodia tai linkkiä ei voi enää avata.');
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error ? requestError.message : 'Kutsulinkkiä ei voitu mitätöidä.',
+      );
+    }
   }
 
   async function deleteData() {
@@ -811,6 +836,7 @@ function App() {
                 <p className="mt-2">
                   Katselet kierrosta kutsulinkillä. Liity tallentaaksesi tuloksia.
                 </p>
+                <PublicRoundView round={invitationRound} />
               </div>
             ) : null}
             <form
@@ -1010,6 +1036,8 @@ function App() {
           activePlayerId={activePlayerId}
           copied={copied}
           onCopyJoinLink={copyJoinLink}
+          canShareInvitation={canShareInvitation}
+          onRevokeInvitation={revokeInvitation}
           onSaveSettings={updateOwnLobbySettings}
           onStartRound={startRound}
         />
@@ -1030,25 +1058,42 @@ function App() {
             <p className="mt-1 text-sm text-[#d4e5d9]">
               {liveConnectionStateName(liveConnectionState)}
             </p>
-            <div className="mt-5 rounded-2xl bg-white p-4 text-center text-[#13251f]">
-              <QRCodeSVG
-                aria-label="Kierroksen liittymis-QR-koodi"
-                className="mx-auto h-auto w-full max-w-52"
-                includeMargin
-                level="M"
-                value={joinUrl}
-              />
-              <p className="mt-3 text-sm font-semibold">
-                Skannaa QR-koodi liittyäksesi kierrokseen.
+            {canShareInvitation ? (
+              <>
+                <div className="mt-5 rounded-2xl bg-white p-4 text-center text-[#13251f]">
+                  <QRCodeSVG
+                    aria-label="Kierroksen liittymis-QR-koodi"
+                    className="mx-auto h-auto w-full max-w-52"
+                    includeMargin
+                    level="M"
+                    value={joinUrl}
+                  />
+                  <p className="mt-3 text-sm font-semibold">
+                    Skannaa QR-koodi liittyäksesi kierrokseen.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="mt-5 min-h-12 w-full rounded-xl bg-[#e5b700] px-4 py-3 font-bold text-[#17231c]"
+                  onClick={copyJoinLink}
+                >
+                  {copied ? 'Liittymislinkki kopioitu' : 'Kopioi liittymislinkki'}
+                </button>
+                {isRoundCreator ? (
+                  <button
+                    type="button"
+                    className="mt-3 min-h-12 w-full rounded-xl border border-[#d4e5d9] px-4 py-3 font-bold text-white"
+                    onClick={() => void revokeInvitation()}
+                  >
+                    Mitätöi kutsulinkki
+                  </button>
+                ) : null}
+              </>
+            ) : (
+              <p className="mt-5 rounded-xl bg-white/10 px-4 py-3 text-sm font-semibold text-[#d4e5d9]">
+                Kutsulinkki ei ole enää voimassa.
               </p>
-            </div>
-            <button
-              type="button"
-              className="mt-5 min-h-12 w-full rounded-xl bg-[#e5b700] px-4 py-3 font-bold text-[#17231c]"
-              onClick={copyJoinLink}
-            >
-              {copied ? 'Liittymislinkki kopioitu' : 'Kopioi liittymislinkki'}
-            </button>
+            )}
             <button
               type="button"
               className="mt-3 min-h-12 w-full rounded-xl border border-[#d4e5d9] px-4 py-3 font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
@@ -1368,11 +1413,38 @@ function App() {
   );
 }
 
+function isInvitationValid(
+  round: Pick<PreviewRound, 'invitationExpiresAt' | 'invitationRevokedAt'>,
+) {
+  return !round.invitationRevokedAt && new Date(round.invitationExpiresAt).getTime() > Date.now();
+}
+
+function PublicRoundView({ round }: { round: PreviewRound }) {
+  return (
+    <div className="mt-4 rounded-xl bg-white/10 px-3 py-3 text-sm">
+      <p className="font-semibold text-white">Kierroksen tilanne</p>
+      <ul className="mt-2 grid gap-1">
+        {round.players.map((player) => (
+          <li key={player.id} className="flex justify-between gap-3">
+            <span>{player.name}</span>
+            <span>{round.standings.winsByPlayerId[player.id] ?? 0} voittoa</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 text-[#d4e5d9]">
+        Tämä on vain luku -näkymä. Liity kierrokseen, jos haluat tallentaa oman tuloksesi.
+      </p>
+    </div>
+  );
+}
+
 function RoundLobby({
   round,
   activePlayerId,
   copied,
   onCopyJoinLink,
+  canShareInvitation,
+  onRevokeInvitation,
   onSaveSettings,
   onStartRound,
 }: {
@@ -1380,6 +1452,8 @@ function RoundLobby({
   activePlayerId: string | null;
   copied: boolean;
   onCopyJoinLink: () => Promise<void>;
+  canShareInvitation: boolean;
+  onRevokeInvitation: () => Promise<void>;
   onSaveSettings: (settings: {
     name: string;
     handicapIndex: number;
@@ -1431,23 +1505,42 @@ function RoundLobby({
           {round.players.length} / 4 pelaajaa ·{' '}
           {round.players.filter((player) => player.ready).length} valmiina
         </p>
-        <div className="mt-5 rounded-2xl bg-white p-4 text-center text-[#13251f]">
-          <QRCodeSVG
-            aria-label="Kierroksen liittymis-QR-koodi"
-            className="mx-auto h-auto w-full max-w-52"
-            includeMargin
-            level="M"
-            value={joinUrl}
-          />
-          <p className="mt-3 text-sm font-semibold">Skannaa QR-koodi liittyäksesi kierrokseen.</p>
-        </div>
-        <button
-          type="button"
-          className="mt-5 min-h-12 w-full rounded-xl bg-[#e5b700] px-4 py-3 font-bold text-[#17231c]"
-          onClick={() => void onCopyJoinLink()}
-        >
-          {copied ? 'Liittymislinkki kopioitu' : 'Kopioi liittymislinkki'}
-        </button>
+        {canShareInvitation ? (
+          <>
+            <div className="mt-5 rounded-2xl bg-white p-4 text-center text-[#13251f]">
+              <QRCodeSVG
+                aria-label="Kierroksen liittymis-QR-koodi"
+                className="mx-auto h-auto w-full max-w-52"
+                includeMargin
+                level="M"
+                value={joinUrl}
+              />
+              <p className="mt-3 text-sm font-semibold">
+                Skannaa QR-koodi liittyäksesi kierrokseen.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="mt-5 min-h-12 w-full rounded-xl bg-[#e5b700] px-4 py-3 font-bold text-[#17231c]"
+              onClick={() => void onCopyJoinLink()}
+            >
+              {copied ? 'Liittymislinkki kopioitu' : 'Kopioi liittymislinkki'}
+            </button>
+            {isCreator ? (
+              <button
+                type="button"
+                className="mt-3 min-h-12 w-full rounded-xl border border-[#d4e5d9] px-4 py-3 font-bold text-white"
+                onClick={() => void onRevokeInvitation()}
+              >
+                Mitätöi kutsulinkki
+              </button>
+            ) : null}
+          </>
+        ) : (
+          <p className="mt-5 rounded-xl bg-white/10 px-4 py-3 text-sm font-semibold text-[#d4e5d9]">
+            Kutsulinkki ei ole enää voimassa.
+          </p>
+        )}
       </article>
 
       <article className="rounded-3xl border border-[#d8e2d8] bg-white p-5 shadow-sm">

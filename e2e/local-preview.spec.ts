@@ -98,3 +98,30 @@ test('a local guest can confirm deletion of their data', async ({ page }) => {
   await expect(page.getByRole('status')).toContainText('Tietosi on poistettu');
   await expect(page.getByRole('heading', { name: 'Pelaa kierros yhdessä.' })).toBeVisible();
 });
+
+test('a creator can revoke a local invitation so its link no longer opens', async ({ browser }) => {
+  const creatorContext = await browser.newContext({
+    ...devices['iPhone 13'],
+    permissions: ['clipboard-read', 'clipboard-write'],
+  });
+  const viewerContext = await browser.newContext({ ...devices['iPhone 13'] });
+  const creator = await creatorContext.newPage();
+  const viewer = await viewerContext.newPage();
+
+  try {
+    await creator.goto('/');
+    await creator.locator('#player-name').fill('Kutsun luoja');
+    await creator.getByRole('button', { name: 'Luo kierros' }).click();
+    await creator.getByRole('button', { name: 'Kopioi liittymislinkki' }).click();
+    const joinLink = await creator.evaluate(() => navigator.clipboard.readText());
+
+    await creator.getByRole('button', { name: 'Mitätöi kutsulinkki' }).click();
+    await expect(creator.getByText('Kutsulinkki on mitätöity.')).toBeVisible();
+
+    await viewer.goto(joinLink);
+    await expect(viewer.getByRole('alert')).toContainText('Kutsulinkki ei ole voimassa');
+  } finally {
+    await creatorContext.close();
+    await viewerContext.close();
+  }
+});

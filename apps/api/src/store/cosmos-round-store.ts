@@ -4,7 +4,9 @@ import {
   anonymizeIdentity,
   createRound,
   finishRound,
+  isInvitationValid,
   joinRound,
+  revokeInvitation,
   scoreRound,
   type AddSideGameInput,
   type CompletedRound,
@@ -13,6 +15,7 @@ import {
   type JoinRoundInput,
   type Round,
   type RoundStore,
+  type RevokeInvitationInput,
   type ScoreRoundInput,
   type UpdateRoundPlayerInput,
   startRound,
@@ -74,7 +77,13 @@ export class CosmosRoundStore implements RoundStore {
       })
       .fetchAll();
 
-    return resources[0]?.round;
+    return resources.map((document) => document.round).find((round) => isInvitationValid(round));
+  }
+
+  public async revokeInvitation(input: RevokeInvitationInput): Promise<Round | undefined> {
+    return this.updateActiveRound(input.roundId, (document) =>
+      revokeInvitation(document.round, input) ? document.round : undefined,
+    );
   }
 
   public async join(input: JoinRoundInput): Promise<Round | undefined> {
