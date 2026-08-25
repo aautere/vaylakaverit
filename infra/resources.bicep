@@ -239,4 +239,5 @@ output cosmosAccountName string = cosmosAccount.name
 output webPubSubName string = webPubSub.name
 output keyVaultName string = keyVault.name
 output storageAccountName string = storageAccount.name
+output applicationInsightsName string = applicationInsights.name
 output staticWebsiteEndpoint string = storageAccount.properties.primaryEndpoints.web

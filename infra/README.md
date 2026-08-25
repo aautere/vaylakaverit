@@ -77,6 +77,15 @@ grant the Function App's managed identity the required Storage data-plane roles:
   <github-actions-client-id>
 ```
 
+Resolve the resource names from the infrastructure deployment outputs so the command does not
+depend on the generated name suffix:
+
+```bash
+az deployment sub show \
+  --name vaylakaverit-development \
+  --query 'properties.outputs.{fn:functionAppName.value,stg:storageAccountName.value,ai:applicationInsightsName.value}'
+```
+
 The script assigns `Storage Blob Data Owner`, `Storage Queue Data Contributor`, and `Storage Table
 Data Contributor` only to the created Function App identity on its backing Storage Account. It also
 grants the GitHub deployment identity `Storage Blob Data Contributor`, which is required by the
@@ -97,6 +106,37 @@ connection string.
 ```bash
 az bicep build --file infra/main.bicep
 ```
+
+## Deployment order and verification
+
+A deployment is not finished when a workflow reports success. Flex Consumption reports a successful
+deployment even when the Functions host cannot load the package, and Azure Storage Static Website
+returns `404` for every unknown path, so both failure modes look healthy in the deployment logs.
+Run the environment through this order and verify it afterwards:
+
+1. `deploy-infrastructure` for the environment.
+2. `scripts/azure-grant-function-storage-access.sh`, once per environment, by an Azure RBAC
+   administrator. Skip this on later deployments; the assignments are idempotent but the deployment
+   identity cannot create them.
+3. `deploy-api` for the environment.
+4. `deploy-web` for the environment.
+5. Verify the result:
+
+```bash
+az login
+./scripts/azure-verify-deployment.sh development
+```
+
+`azure-verify-deployment.sh` is read only. It resolves every resource name from the deployment
+outputs and then checks that the Functions host indexed the deployed package, that
+`GET /api/health` answers, that the API allows preflighted requests from the PWA origin, that the
+published PWA targets the Function App origin rather than a relative `/api` path on the static
+website, and that the managed identity holds every role it needs. The script exits non-zero and
+names the failing check when any of these regress.
+
+`pnpm check` runs `scripts/__tests__/run-all.sh`, which exercises both Azure scripts against a
+stubbed `az` so their argument handling and required role assignments stay covered without touching
+a subscription.
 
 ## Provisioning
 
