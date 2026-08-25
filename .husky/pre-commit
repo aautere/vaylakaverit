@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+
+set -eu
+
+bash .github/hooks/guard-main.sh
+bash .github/hooks/check-secrets.sh
+pnpm format:check

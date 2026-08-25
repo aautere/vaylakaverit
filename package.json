@@ -1,0 +1,23 @@
+{
+  "name": "golf",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.12.0",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "spec:new": "./scripts/openspec-new-change.sh",
+    "spec:validate": "openspec validate --all --strict --no-interactive",
+    "harness:test": "bash scripts/__tests__/run-all.sh",
+    "check": "pnpm format:check && pnpm harness:test && pnpm spec:validate",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@fission-ai/openspec": "1.1.1",
+    "husky": "^9.1.0",
+    "prettier": "^3.3.3"
+  }
+}

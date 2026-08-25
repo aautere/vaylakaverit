@@ -1,0 +1,35 @@
+schema: spec-driven
+
+context: |
+  # Project context — Golf
+
+  This is a new golf application. Its product scope, users, domain rules, technical
+  stack, integrations, and deployment model are intentionally undecided. Establish
+  them through approved OpenSpec artifacts before implementation.
+
+  The repository uses pnpm and Node 20 or newer. Follow AGENTS.md for the complete
+  working agreement. Do not add dependencies or commit to an architecture until an
+  approved design makes the choice necessary.
+
+workflow:
+  - After writing each OpenSpec artifact, show it to the user for review before moving
+    to the next artifact.
+  - Do not begin implementation until the user has explicitly approved the task list.
+  - Keep the user conversation in their language; keep repository artifacts in English.
+
+rules:
+  proposal:
+    - Keep proposals below 500 words.
+    - State the user problem, intended change, impact, assumptions, and non-goals.
+    - 'Use `status: draft` until the user explicitly approves the proposal in chat.'
+  specs:
+    - Write requirements as observable behavior using SHALL or MUST.
+    - Give every requirement at least one Given/When/Then scenario.
+    - Include validation, error, and empty-state scenarios where applicable.
+  design:
+    - Record meaningful decisions, alternatives, data ownership, privacy implications,
+      and test strategy.
+    - Avoid selecting technology without a documented product or operational reason.
+  tasks:
+    - Make every task small and independently checkable.
+    - End with relevant tests, quality checks, and documentation updates.
