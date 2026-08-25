@@ -41,6 +41,22 @@ Small editorial fixes that do not alter user-visible behaviour may skip OpenSpec
 - Keep secrets in local environment files only; never commit them.
 - Run the smallest relevant checks before saying work is ready.
 
+## Task completion
+
+Complete only one explicitly approved OpenSpec task at a time. After its required validation passes,
+identify every repository-relative path owned by that task and use the local completion helper:
+
+```sh
+~/.copilot/skills/vaylakaverit-completion/scripts/complete-task.sh \
+  --message "type: concise completed task" \
+  --scope path/owned/by-task
+```
+
+Provide one `--scope` per owned file or directory. The helper refuses out-of-scope changes, stages
+only the supplied scope, commits with the Copilot co-author trailer, pushes to the tracked upstream,
+and prints the resulting commit and status. If validation, commit, push, or verification fails, report
+the task as blocked; never bypass hooks, amend, or commit unrelated work.
+
 ## Repository conventions
 
 - Use pnpm, not npm or yarn.
