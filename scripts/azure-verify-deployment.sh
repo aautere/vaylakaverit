@@ -50,9 +50,25 @@ http_headers() {
   curl --silent --show-error --dump-header - --output /dev/null "$@"
 }
 
+app_setting() {
+  az functionapp config appsettings list \
+    --resource-group "$resource_group" \
+    --name "$2" \
+    --query "[?name=='$1'].value | [0]" \
+    --output tsv \
+    --only-show-errors
+}
+
+# Cosmos DB for NoSQL data-plane access is a sqlRoleAssignments child resource
+# rather than an Azure role assignment, so it does not appear in
+# `az role assignment list` and is matched on its built-in role definition id.
+cosmos_data_contributor_id='00000000-0000-0000-0000-000000000002'
+
 function_app_name="$(deployment_output functionAppName)"
 storage_account_name="$(deployment_output storageAccountName)"
 application_insights_name="$(deployment_output applicationInsightsName)"
+cosmos_account_name="$(deployment_output cosmosAccountName)"
+web_pubsub_name="$(deployment_output webPubSubName)"
 api_origin="$(deployment_output functionAppUrl)"
 static_website_endpoint="$(deployment_output staticWebsiteEndpoint)"
 web_origin="${static_website_endpoint%/}"
@@ -63,10 +79,15 @@ if [ -z "$function_app_name" ] || [ -z "$api_origin" ] || [ -z "$web_origin" ]; 
   exit 1
 fi
 
+round_store="$(app_setting ROUND_STORE "$function_app_name")"
+round_update_transport="$(app_setting ROUND_UPDATE_TRANSPORT "$function_app_name")"
+
 echo "environment          : $environment"
 echo "function app         : $function_app_name"
 echo "api origin           : $api_origin"
 echo "pwa origin           : $web_origin"
+echo "round store          : ${round_store:-unset}"
+echo "round update transport: ${round_update_transport:-unset}"
 echo
 
 # The Functions host indexes zero functions when the deployment package cannot
@@ -203,10 +224,69 @@ else
   fail "the Function App identity is missing 'Monitoring Metrics Publisher' on Application Insights"
 fi
 
+# Cosmos DB and Web PubSub are provisioned for every environment, but only the
+# environments configured to use them need data-plane access. Development runs
+# the preview store and the polling transport, so requiring the grants there
+# would report a failure that has no effect on the running environment.
+if [ "$round_store" = 'cosmos' ]; then
+  if [ -z "$cosmos_account_name" ]; then
+    fail "the deployment does not output cosmosAccountName, so Cosmos DB access cannot be verified"
+  else
+    cosmos_scope="$(
+      az cosmosdb show \
+        --resource-group "$resource_group" \
+        --name "$cosmos_account_name" \
+        --query id \
+        --output tsv \
+        --only-show-errors
+    )"
+    cosmos_data_roles="$(
+      az cosmosdb sql role assignment list \
+        --account-name "$cosmos_account_name" \
+        --resource-group "$resource_group" \
+        --query "[?principalId=='$function_principal_id' && scope=='$cosmos_scope'].roleDefinitionId" \
+        --output tsv \
+        --only-show-errors
+    )"
+
+    if echo "$cosmos_data_roles" | grep -qE "/$cosmos_data_contributor_id\$"; then
+      pass "the Function App identity has 'Cosmos DB Built-in Data Contributor' on the Cosmos DB account"
+    else
+      fail "the Function App identity is missing 'Cosmos DB Built-in Data Contributor' on the Cosmos DB account"
+    fi
+  fi
+else
+  pass "the round store is '${round_store:-unset}', so Cosmos DB data-plane access is not required"
+fi
+
+if [ "$round_update_transport" = 'web-pubsub' ]; then
+  if [ -z "$web_pubsub_name" ]; then
+    fail "the deployment does not output webPubSubName, so Web PubSub access cannot be verified"
+  else
+    web_pubsub_scope="$(
+      az webpubsub show \
+        --resource-group "$resource_group" \
+        --name "$web_pubsub_name" \
+        --query id \
+        --output tsv \
+        --only-show-errors
+    )"
+
+    if assigned_role "$web_pubsub_scope" | grep -qx 'Web PubSub Service Owner'; then
+      pass "the Function App identity has 'Web PubSub Service Owner' on the Web PubSub resource"
+    else
+      fail "the Function App identity is missing 'Web PubSub Service Owner' on the Web PubSub resource"
+    fi
+  fi
+else
+  pass "the round update transport is '${round_update_transport:-unset}', so Web PubSub access is not required"
+fi
+
 echo
 if [ "$failures" -ne 0 ]; then
   echo "$failures check(s) failed. The '$environment' environment is not ready." >&2
-  echo "Run scripts/azure-grant-function-storage-access.sh for missing role assignments." >&2
+  echo "Run scripts/azure-grant-function-storage-access.sh and" >&2
+  echo "scripts/azure-grant-function-data-access.sh for missing role assignments." >&2
   exit 1
 fi
 

@@ -51,8 +51,8 @@ The web application is served at <http://127.0.0.1:5173> and the API at
 <http://127.0.0.1:7071>. The API defaults to `ROUND_STORE=preview`, so no Azure configuration is
 required locally. To use Cosmos DB in a deployed environment, set `ROUND_STORE=cosmos`,
 `COSMOS_ENDPOINT`, `COSMOS_DATABASE_ID`, and `COSMOS_CONTAINER_ID`. The API authenticates to
-Cosmos with `DefaultAzureCredential`; configure the Function App's managed identity with Cosmos
-data-plane access rather than a connection key.
+Cosmos with `DefaultAzureCredential`; grant the Function App's managed identity Cosmos data-plane
+access with `scripts/azure-grant-function-data-access.sh` rather than using a connection key.
 
 Local preview also defaults to `AUTH_MODE=preview`. It creates a device-local guest identity and
 does not need Apple or Azure credentials. A deployed Apple-authentication seam requires
@@ -65,9 +65,9 @@ Preview also defaults to `ROUND_UPDATE_TRANSPORT=preview`. Joined browser sessio
 updates by polling the authoritative snapshot once per second, without Azure credentials. Production
 uses `ROUND_UPDATE_TRANSPORT=web-pubsub`, `WEB_PUBSUB_ENDPOINT`, and `WEB_PUBSUB_HUB`; the Function
 App obtains Azure Web PubSub tokens and publishes only to `round:<round-id>` groups after verifying
-the caller is a participant. Assign the Function App managed identity the Azure Web PubSub service
-role required to generate client tokens and send group messages. Link-only viewers can still refresh
-the normal round snapshot but cannot obtain a live connection.
+the caller is a participant. `scripts/azure-grant-function-data-access.sh` assigns the Function App
+managed identity the `Web PubSub Service Owner` role those calls require. Link-only viewers can still
+refresh the normal round snapshot but cannot obtain a live connection.
 
 ### Browser E2E
 

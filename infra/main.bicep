@@ -40,3 +40,5 @@ output functionAppName string = application.outputs.functionAppName
 output functionAppUrl string = application.outputs.functionAppUrl
 output storageAccountName string = application.outputs.storageAccountName
 output applicationInsightsName string = application.outputs.applicationInsightsName
+output cosmosAccountName string = application.outputs.cosmosAccountName
+output webPubSubName string = application.outputs.webPubSubName
