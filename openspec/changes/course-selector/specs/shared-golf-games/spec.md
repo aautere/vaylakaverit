@@ -90,8 +90,8 @@ winner SHALL retain the existing unresolved outcome.
 
 - **GIVEN** a Rock Golf 9-hole round is configured
 - **WHEN** the system evaluates a handicap game on its first hole
-- **THEN** it uses the official handicap index 5 recorded for the first pass of round hole 1
-- **AND** it does not require the second-pass handicap indexes
+- **THEN** it uses the official normalized handicap index 3 for round hole 1
+- **AND** that value is derived from the first-pass 18-hole handicap index 5
 
 #### Scenario: A 9-hole game cannot extend past the round
 
