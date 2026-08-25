@@ -42,17 +42,17 @@ offer its configured rating-table choices.
 
 ## States and recovery
 
-| State | Trigger | User-visible message/action | Recovery | Non-colour cue |
-| --- | --- | --- | --- | --- |
-| Empty | No course configurations are available. | State that a round cannot be created until a course is available. | Show join and history paths. | Explicit empty-state text. |
-| Loading | Course configurations are loading. | Keep the form context and state that courses are loading. | Disable only the create action until a valid selection exists. | Busy text and disabled action. |
-| Success | Course or length selection changes. | Confirm the selected course and length near the control. | Continue with tee and player setup. | Text summary. |
-| Unavailable rating table | Rock Golf is selected while a women's-table choice is present. | Explain that Rock Golf currently uses the men's table and show the applied value. | Continue with the available table. | Explicit field text. |
-| Error | Course data cannot load or the server rejects a stale selection. | Say that the course selection could not be used and retain any safe input. | Retry loading or select an available course. | Assertive text associated with the field. |
-| Permission denied | Not applicable: selecting a course is available to every creator. | N/A. | N/A. | N/A. |
-| Offline | A creator has no connection before a round exists. | Explain that a new round requires a connection. | Retry after reconnecting; retain form values where safe. | Explicit text. |
-| Synchronizing | Not applicable: course selection is confirmed when the round is created. | N/A. | N/A. | N/A. |
-| Conflict | The selected configuration changed after the form loaded. | Explain that the course settings were updated and identify the affected selection. | Refresh choices and require deliberate reselection. | Assertive text and returned focus. |
+| State                    | Trigger                                                                  | User-visible message/action                                                        | Recovery                                                       | Non-colour cue                            |
+| ------------------------ | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- | -------------------------------------------------------------- | ----------------------------------------- |
+| Empty                    | No course configurations are available.                                  | State that a round cannot be created until a course is available.                  | Show join and history paths.                                   | Explicit empty-state text.                |
+| Loading                  | Course configurations are loading.                                       | Keep the form context and state that courses are loading.                          | Disable only the create action until a valid selection exists. | Busy text and disabled action.            |
+| Success                  | Course or length selection changes.                                      | Confirm the selected course and length near the control.                           | Continue with tee and player setup.                            | Text summary.                             |
+| Unavailable rating table | Rock Golf is selected while a women's-table choice is present.           | Explain that Rock Golf currently uses the men's table and show the applied value.  | Continue with the available table.                             | Explicit field text.                      |
+| Error                    | Course data cannot load or the server rejects a stale selection.         | Say that the course selection could not be used and retain any safe input.         | Retry loading or select an available course.                   | Assertive text associated with the field. |
+| Permission denied        | Not applicable: selecting a course is available to every creator.        | N/A.                                                                               | N/A.                                                           | N/A.                                      |
+| Offline                  | A creator has no connection before a round exists.                       | Explain that a new round requires a connection.                                    | Retry after reconnecting; retain form values where safe.       | Explicit text.                            |
+| Synchronizing            | Not applicable: course selection is confirmed when the round is created. | N/A.                                                                               | N/A.                                                           | N/A.                                      |
+| Conflict                 | The selected configuration changed after the form loaded.                | Explain that the course settings were updated and identify the affected selection. | Refresh choices and require deliberate reselection.            | Assertive text and returned focus.        |
 
 ## Accessibility
 

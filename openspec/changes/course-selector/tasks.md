@@ -10,7 +10,7 @@
 - [x] 1.2 Confirm Rock Golf's official 9- and 18-hole handicap treatment and the product default
       tee. The selected calculator provides the men's calculation policy; tee O is the configured
       product default for both Rock Golf layouts.
-- [ ] 1.3 Add a versioned Rock Golf configuration only after the verified data is complete, with
+- [x] 1.3 Add a versioned Rock Golf configuration only after the verified data is complete, with
       provenance and data-integrity tests for its 9-hole and two-pass 18-hole layouts.
 
 ## 2. Generalize course and round data

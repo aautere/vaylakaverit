@@ -30,18 +30,18 @@ its retrieval date as the initial course-data snapshot version.
 
 ## Verified hole and tee data
 
-| Hole | Par | R metres | O metres | C metres | K metres |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| 1 | 3 | 151 | 129 | 122 | 92 |
-| 2 | 3 | 169 | 157 | 157 | 96 |
-| 3 | 3 | 175 | 163 | 128 | 88 |
-| 4 | 3 | 138 | 119 | 112 | 94 |
-| 5 | 3 | 123 | 116 | 86 | 81 |
-| 6 | 3 | 205 | 201 | 168 | 149 |
-| 7 | 3 | 136 | 124 | 111 | 99 |
-| 8 | 3 | 179 | 154 | 148 | 125 |
-| 9 | 3 | 162 | 134 | 127 | 110 |
-| **Total** | **27** | **1438** | **1297** | **1159** | **934** |
+| Hole      |    Par | R metres | O metres | C metres | K metres |
+| --------- | -----: | -------: | -------: | -------: | -------: |
+| 1         |      3 |      151 |      129 |      122 |       92 |
+| 2         |      3 |      169 |      157 |      157 |       96 |
+| 3         |      3 |      175 |      163 |      128 |       88 |
+| 4         |      3 |      138 |      119 |      112 |       94 |
+| 5         |      3 |      123 |      116 |       86 |       81 |
+| 6         |      3 |      205 |      201 |      168 |      149 |
+| 7         |      3 |      136 |      124 |      111 |       99 |
+| 8         |      3 |      179 |      154 |      148 |      125 |
+| 9         |      3 |      162 |      134 |      127 |      110 |
+| **Total** | **27** | **1438** | **1297** | **1159** |  **934** |
 
 The official club pages do not publish a versioned playing-handicap table. Rock Golf's official
 slope page links to an interactive calculator that provides the men's Course Rating, Slope Rating,

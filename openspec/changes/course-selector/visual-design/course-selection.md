@@ -35,14 +35,14 @@ more visual emphasis than the repeated source-hole label.
 
 ## Components and semantic foundation
 
-| UI area | Shared/domain component | Semantic token intent | Foundation gap |
-| --- | --- | --- | --- |
-| Course and length groups | Native radio groups and labelled full-width rows | `surface-raised`, `border-strong`, `focus-ring`, selected action/border treatment | None |
-| Selected course summary | `Card` or compact summary row | `surface-subtle`, `text-strong`, `text-muted` | None |
-| Rock Golf rating table | Labelled read-only information row | `surface-subtle`, `text-strong`, `text-muted` | None |
-| Loading, unavailable, stale, offline states | `StatusMessage` | Existing info, warning, and danger status tokens | None |
-| Create action | `Action` | Existing primary and disabled action tokens | None |
-| Second-pass score context | Existing score row/card text | `text-strong` for round hole, `text-muted` for pass/source-hole context | None |
+| UI area                                     | Shared/domain component                          | Semantic token intent                                                             | Foundation gap |
+| ------------------------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------- | -------------- |
+| Course and length groups                    | Native radio groups and labelled full-width rows | `surface-raised`, `border-strong`, `focus-ring`, selected action/border treatment | None           |
+| Selected course summary                     | `Card` or compact summary row                    | `surface-subtle`, `text-strong`, `text-muted`                                     | None           |
+| Rock Golf rating table                      | Labelled read-only information row               | `surface-subtle`, `text-strong`, `text-muted`                                     | None           |
+| Loading, unavailable, stale, offline states | `StatusMessage`                                  | Existing info, warning, and danger status tokens                                  | None           |
+| Create action                               | `Action`                                         | Existing primary and disabled action tokens                                       | None           |
+| Second-pass score context                   | Existing score row/card text                     | `text-strong` for round hole, `text-muted` for pass/source-hole context           | None           |
 
 ## Important visual states
 
