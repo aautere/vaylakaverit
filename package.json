@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "pnpm --filter @vaylakaverit/web dev",
     "dev:api": "pnpm --filter @vaylakaverit/api dev",
-    "preview": "bash scripts/with-node22.sh pnpm --parallel --filter @vaylakaverit/api --filter @vaylakaverit/web dev",
+    "preview": "FUNCTIONS_WORKER_RUNTIME=node bash scripts/with-node22.sh pnpm --parallel --filter @vaylakaverit/api --filter @vaylakaverit/web dev",
     "e2e": "bash scripts/with-node22.sh playwright test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

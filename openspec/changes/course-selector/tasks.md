@@ -47,9 +47,9 @@
 
 ## 5. Verify the completed flow
 
-- [ ] 5.1 Exercise Talma 18-hole, Rock 9-hole, and Rock 18-hole create-to-history flows in local
+- [x] 5.1 Exercise Talma 18-hole, Rock 9-hole, and Rock 18-hole create-to-history flows in local
       preview, including score corrections, game boundaries, errors, and stable history.
-- [ ] 5.2 Complete the planned UX critique with iPhone-sized and keyboard evidence; resolve or
+- [x] 5.2 Complete the planned UX critique with iPhone-sized and keyboard evidence; resolve or
       explicitly accept every finding in `ux-reviews/course-selection-critique.md`.
-- [ ] 5.3 Run the change's targeted tests, formatting, type checks, and OpenSpec validation; update
+- [x] 5.3 Run the change's targeted tests, formatting, type checks, and OpenSpec validation; update
       user-facing preview documentation if the course-selection flow changes it.
