@@ -81,9 +81,9 @@ offer its configured rating-table choices.
 - **Assumption:** verified course configuration data is available before Rock Golf is shown.
 - **Decision:** Rock Golf exposes only its verified men's rating table in the first version. A
   future verified women's table is a course-data version, not a client-side fallback.
-- **Open question:** Rock Golf's official source must confirm the men's rating/slope values,
-  playing-handicap data, effective date, and product default tee. This is a data gate in the
-  technical design, not a user-interface decision.
+- **Decision:** Rock Golf uses the selected calculator snapshot for its men's rating/slope values,
+  playing-handicap policy, and O-tee default. A future source update creates a new course-data
+  version rather than changing historical rounds.
 
 ## Handoff
 
