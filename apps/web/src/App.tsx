@@ -9,6 +9,7 @@ import {
   removePendingScoreChange,
   type PendingScoreChange,
 } from './lib/score-outbox';
+import { apiUrl } from './lib/api-url';
 
 type PreviewPlayer = {
   id: string;
@@ -113,7 +114,7 @@ async function request<T>(
   body?: Record<string, unknown>,
   method: 'GET' | 'POST' | 'DELETE' = body ? 'POST' : 'GET',
 ): Promise<T> {
-  const response = await fetch(path, {
+  const response = await fetch(apiUrl(path), {
     method,
     headers: {
       ...(body ? { 'content-type': 'application/json' } : {}),
