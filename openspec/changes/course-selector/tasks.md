@@ -5,7 +5,8 @@
 - [ ] 1.1 Obtain and record Rock Golf's official scorecard, tee labels, par, handicap indexes,
       rating tables, playing-handicap lookup data, source URL, and effective date for every offered
       round length. Blocked until Rock Golf publishes or confirms the missing official
-      hole-handicap indexes and playing-handicap lookup data; see
+      hole-handicap indexes, rating/slope tables, playing-handicap lookup data, and their effective
+      date; see
       `rock-golf-source-verification.md`.
 - [ ] 1.2 Confirm Rock Golf's official 9- and 18-hole handicap treatment and the product default
       tee; update the approved design and requirements if the official source changes any stated

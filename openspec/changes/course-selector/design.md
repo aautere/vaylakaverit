@@ -104,10 +104,11 @@ from old clients and invitation holders.
 
 ## Open Questions
 
-- Rock Golf's official site and its linked handicap calculator confirm its 9- and 18-hole layouts,
-  tee labels, lengths, par, course ratings, and slope ratings. As recorded in
-  `rock-golf-source-verification.md`, the calculator currently omits every hole-handicap index and
-  does not publish the required playing-handicap lookup table. Rock Golf must publish or confirm
-  those values, including their effective date, before enabling the configuration.
+- Rock Golf's official site confirms its nine-hole par-3 layout, tee labels, tee lengths, and that
+  18 holes are played as two nine-hole rounds. As recorded in
+  `rock-golf-source-verification.md`, neither the site nor its linked calculator provides the
+  required hole-handicap indexes, rating/slope tables, or a versioned playing-handicap lookup table.
+  Rock Golf must publish or confirm those values, including their effective date, before enabling
+  the configuration.
 - Confirm whether the official source designates a preferred default tee for Rock Golf; otherwise
   the product owner must choose one explicitly before implementation.
