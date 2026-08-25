@@ -22,6 +22,12 @@ Deploy the Function package with the `deploy-api` workflow before deploying the 
 deployment outputs and use the GitHub environment's federated Azure identity; no API secrets are
 embedded in the browser build.
 
+Flex Consumption mounts the deployment package read only and does not resolve symlinks inside it.
+The `deploy-api` workflow therefore builds the package with a hoisted `node_modules` tree instead of
+pnpm's default symlinked store, and fails if unexpected symlinks remain. A symlinked package
+deploys successfully but leaves the Node worker unable to resolve `@azure/functions`, so the host
+starts and reports healthy while indexing zero functions.
+
 Development uses the non-persistent preview store, guest identity, and polling transport so it
 does not require Apple credentials or data-plane access to Cosmos DB and Web PubSub. Production
 uses Cosmos DB, Apple authentication, and Web PubSub; configure its Apple settings through secure
@@ -59,13 +65,20 @@ grant the Function App's managed identity the required Storage data-plane roles:
 ./scripts/azure-grant-function-storage-access.sh \
   <resource-group> \
   <function-app-name> \
-  <storage-account-name>
+  <storage-account-name> \
+  <application-insights-name> \
+  <github-actions-client-id>
 ```
 
 The script assigns `Storage Blob Data Owner`, `Storage Queue Data Contributor`, and `Storage Table
 Data Contributor` only to the created Function App identity on its backing Storage Account. It also
 grants the GitHub deployment identity `Storage Blob Data Contributor`, which is required by the
 `deploy-web` workflow to enable the static website and upload PWA files.
+
+The script additionally grants the Function App identity `Monitoring Metrics Publisher` on the
+Application Insights component. Application Insights has local authentication disabled, so without
+this role the Functions host silently drops all telemetry, including the startup errors that
+explain why a deployed package failed to index any functions.
 
 An Azure RBAC administrator must also grant the Function App identity `Web PubSub Service Owner` on
 the provisioned Web PubSub resource. The API uses its managed identity to issue participant-scoped
