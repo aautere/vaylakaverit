@@ -3,6 +3,8 @@ dist/
 build/
 coverage/
 .cache/
+playwright-report/
+test-results/
 infra/*.json
 apps/api/local.settings.json
 

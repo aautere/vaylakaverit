@@ -1,8 +1,9 @@
 @import 'tailwindcss';
+@import './ui/tokens.css';
 
 :root {
-  color: #13251f;
-  background: #f7f8f4;
+  color: var(--text-primary);
+  background: var(--surface-page);
   font-family:
     Inter,
     ui-sans-serif,
@@ -25,11 +26,4 @@ button,
 input,
 select {
   font: inherit;
-}
-
-button:focus-visible,
-input:focus-visible,
-select:focus-visible {
-  outline: 3px solid #e5b700;
-  outline-offset: 3px;
 }
