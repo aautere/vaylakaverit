@@ -83,7 +83,7 @@ depend on the generated name suffix:
 ```bash
 az deployment sub show \
   --name vaylakaverit-development \
-  --query 'properties.outputs.{fn:functionAppName.value,stg:storageAccountName.value,ai:applicationInsightsName.value}'
+  --query 'properties.outputs.{fn:functionAppName.value,stg:storageAccountName.value,ai:applicationInsightsName.value,cosmos:cosmosAccountName.value,live:webPubSubName.value}'
 ```
 
 The script assigns `Storage Blob Data Owner`, `Storage Queue Data Contributor`, and `Storage Table
@@ -96,10 +96,42 @@ Application Insights component. Application Insights has local authentication di
 this role the Functions host silently drops all telemetry, including the startup errors that
 explain why a deployed package failed to index any functions.
 
-An Azure RBAC administrator must also grant the Function App identity `Web PubSub Service Owner` on
-the provisioned Web PubSub resource. The API uses its managed identity to issue participant-scoped
-client tokens and publish `round:<round-id>` group events; it does not use a Web PubSub key or
-connection string.
+### Cosmos DB and Web PubSub data-plane access
+
+An environment that runs `ROUND_STORE=cosmos` or `ROUND_UPDATE_TRANSPORT=web-pubsub` needs a second
+set of grants. Cosmos DB is provisioned with `disableLocalAuth: true` and Web PubSub with
+`disableAadAuth: false`, and the API authenticates to both with `DefaultAzureCredential`, so an
+environment without these grants deploys successfully and then fails on the first request that
+touches a round:
+
+```bash
+./scripts/azure-grant-function-data-access.sh \
+  <resource-group> \
+  <function-app-name> \
+  <cosmos-account-name> \
+  <web-pubsub-name>
+```
+
+The script grants the Function App identity:
+
+- `Cosmos DB Built-in Data Contributor`, scoped to the whole Cosmos DB account. Cosmos DB for NoSQL
+  data-plane access is not Azure RBAC. It is a
+  `Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments` child resource with its own built-in
+  role definitions, so an Azure role such as Contributor or even Owner grants no access to documents.
+  `Cosmos DB Built-in Data Reader` is insufficient because the API writes rounds.
+- `Web PubSub Service Owner` on the Web PubSub resource. The API both publishes to
+  `round:<round-id>` groups and mints participant client access tokens. Web PubSub only offers
+  `Web PubSub Service Owner` and the read-only `Web PubSub Service Reader` as data-plane roles, and
+  the reader role can do neither, so Service Owner is the least privileged built-in role that works.
+
+Both grants are safe to re-run. `az role assignment create` is already a no-op when the assignment
+exists, but `az cosmosdb sql role assignment create` mints a fresh assignment id on every call and
+does not detect an equivalent existing assignment, so the script checks for the Cosmos assignment
+before creating it rather than accumulating duplicates.
+
+Development runs the preview store and the polling transport, so it does not need these grants.
+Run the script before switching an environment to Cosmos DB or Web PubSub, and before the first
+production deployment.
 
 ## Local validation
 
@@ -118,9 +150,12 @@ Run the environment through this order and verify it afterwards:
 2. `scripts/azure-grant-function-storage-access.sh`, once per environment, by an Azure RBAC
    administrator. Skip this on later deployments; the assignments are idempotent but the deployment
    identity cannot create them.
-3. `deploy-api` for the environment.
-4. `deploy-web` for the environment.
-5. Verify the result:
+3. `scripts/azure-grant-function-data-access.sh`, by the same administrator, for any environment
+   that runs `ROUND_STORE=cosmos` or `ROUND_UPDATE_TRANSPORT=web-pubsub`. Development does not need
+   it; production does.
+4. `deploy-api` for the environment.
+5. `deploy-web` for the environment.
+6. Verify the result:
 
 ```bash
 az login
@@ -134,7 +169,11 @@ published PWA targets the Function App origin rather than a relative `/api` path
 website, and that the managed identity holds every role it needs. The script exits non-zero and
 names the failing check when any of these regress.
 
-`pnpm check` runs `scripts/__tests__/run-all.sh`, which exercises both Azure scripts against a
+The Cosmos DB and Web PubSub grants are only required by the environments that use those back ends,
+so the script reads the Function App's `ROUND_STORE` and `ROUND_UPDATE_TRANSPORT` settings and
+verifies each grant only when the environment is configured to depend on it.
+
+`pnpm check` runs `scripts/__tests__/run-all.sh`, which exercises all three Azure scripts against a
 stubbed `az` so their argument handling and required role assignments stay covered without touching
 a subscription.
 
