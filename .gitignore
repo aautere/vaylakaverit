@@ -3,6 +3,7 @@ dist/
 build/
 coverage/
 .cache/
+infra/*.json
 
 # Environment and secrets
 .env
