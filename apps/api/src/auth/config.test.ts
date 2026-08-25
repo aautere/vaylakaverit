@@ -1,52 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { readAuthConfig } from './config.js';
 
-describe('authentication configuration', () => {
-  it('defaults to local preview guests without Apple settings', () => {
-    expect(readAuthConfig({})).toEqual({ kind: 'preview' });
+describe('guest authentication configuration', () => {
+  it('uses guest sessions without provider credentials in every environment', () => {
+    expect(readAuthConfig({})).toEqual({ kind: 'guest' });
+    expect(readAuthConfig({ ROUND_STORE: 'cosmos' })).toEqual({ kind: 'guest' });
   });
 
-  it('requires all Apple and session settings when Apple authentication is enabled', () => {
-    expect(() => readAuthConfig({ AUTH_MODE: 'apple' })).toThrow(
-      'APPLE_CLIENT_ID is required when AUTH_MODE is "apple".',
-    );
-    expect(() =>
-      readAuthConfig({
-        AUTH_MODE: 'apple',
-        APPLE_CLIENT_ID: 'com.example.golf',
-        APPLE_TEAM_ID: 'ABCDEFGHIJ',
-        APPLE_KEY_ID: 'KLMNOPQRST',
-        APPLE_PRIVATE_KEY: 'key-reference',
-        SESSION_JWT_SECRET: 'too-short',
-      }),
-    ).toThrow('SESSION_JWT_SECRET must contain at least 32 characters.');
-  });
-
-  it('does not allow a Cosmos-backed API to use preview guests', () => {
-    expect(() => readAuthConfig({ ROUND_STORE: 'cosmos' })).toThrow(
-      'APPLE_CLIENT_ID is required when AUTH_MODE is "apple".',
-    );
-    expect(() => readAuthConfig({ ROUND_STORE: 'cosmos', AUTH_MODE: 'preview' })).toThrow(
-      'AUTH_MODE "preview" is only available with ROUND_STORE "preview".',
-    );
-  });
-
-  it('accepts Apple settings supplied through runtime configuration', () => {
-    expect(
-      readAuthConfig({
-        AUTH_MODE: 'apple',
-        APPLE_CLIENT_ID: 'com.example.golf',
-        APPLE_TEAM_ID: 'ABCDEFGHIJ',
-        APPLE_KEY_ID: 'KLMNOPQRST',
-        APPLE_PRIVATE_KEY:
-          '@Microsoft.KeyVault(SecretUri=https://example.vault.azure.net/secrets/apple)',
-        SESSION_JWT_SECRET: 'a-session-secret-with-at-least-32-characters',
-      }),
-    ).toMatchObject({
-      kind: 'apple',
-      clientId: 'com.example.golf',
-      teamId: 'ABCDEFGHIJ',
-      keyId: 'KLMNOPQRST',
-    });
+  it('rejects removed provider authentication modes', () => {
+    expect(() => readAuthConfig({ AUTH_MODE: 'apple' })).toThrow('AUTH_MODE must be "guest".');
+    expect(() => readAuthConfig({ AUTH_MODE: 'preview' })).toThrow('AUTH_MODE must be "guest".');
   });
 });

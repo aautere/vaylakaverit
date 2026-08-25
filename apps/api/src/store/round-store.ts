@@ -598,9 +598,7 @@ function createPlayer(
   if (!isRatingTable(ratingTable)) {
     throw new Error('Valitse miesten tai naisten virallinen tasoitustaulukko.');
   }
-  if (!name.trim()) {
-    throw new Error('Anna pelaajan nimi.');
-  }
+  const displayName = validateRoundDisplayName(name);
   if (!Number.isFinite(handicapIndex)) {
     throw new Error('Anna kelvollinen tasoitusindeksi.');
   }
@@ -608,11 +606,27 @@ function createPlayer(
   return {
     id: randomUUID(),
     identityId,
-    name: name.trim(),
+    name: displayName,
     teeLabel,
     ratingTable,
     handicapIndex,
     playingHandicap: lookupTalmaMasterPlayingHandicap(teeLabel, ratingTable, handicapIndex),
     ready: false,
   };
+}
+
+function validateRoundDisplayName(value: string): string {
+  const displayName = value.trim();
+  const visibleCharacterCount = [
+    ...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(displayName),
+  ].filter(({ segment }) => /[\p{L}\p{N}\p{P}\p{S}]/u.test(segment)).length;
+  if (
+    !displayName ||
+    /[\p{Cc}\p{Cs}]/u.test(displayName) ||
+    visibleCharacterCount === 0 ||
+    visibleCharacterCount > 40
+  ) {
+    throw new Error('Kirjoita 1–40 merkin nimi.');
+  }
+  return displayName;
 }

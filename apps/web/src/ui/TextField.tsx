@@ -1,10 +1,11 @@
-import type { InputHTMLAttributes } from 'react';
+import type { InputHTMLAttributes, Ref } from 'react';
 
 type TextFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'id'> & {
   id: string;
   label: string;
   hint?: string;
   error?: string;
+  inputRef?: Ref<HTMLInputElement>;
 };
 
 export function TextField({
@@ -12,6 +13,7 @@ export function TextField({
   label,
   hint,
   error,
+  inputRef,
   className,
   'aria-describedby': describedBy,
   'aria-invalid': ariaInvalid,
@@ -32,6 +34,7 @@ export function TextField({
         aria-invalid={error ? true : ariaInvalid}
         className={['ui-field__control', className].filter(Boolean).join(' ')}
         id={id}
+        ref={inputRef}
       />
       {hint ? (
         <p className="ui-field__hint" id={hintId}>

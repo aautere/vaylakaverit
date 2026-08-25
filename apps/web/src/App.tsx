@@ -9,6 +9,7 @@ import {
   removePendingScoreChange,
   type PendingScoreChange,
 } from './lib/score-outbox';
+import { Action, Card, StatusMessage, TextField } from './ui';
 
 type PreviewPlayer = {
   id: string;
@@ -84,6 +85,18 @@ type LiveConnection =
       url: string;
     };
 
+type GuestSession = {
+  sessionToken: string;
+  identityId: string;
+  displayName: string;
+  expiresAt: string;
+};
+
+type InvitationLookup = {
+  invitationToken: string;
+  joinRequired: true;
+};
+
 class ApiRequestError extends Error {
   readonly status: number;
   readonly payload: unknown;
@@ -95,17 +108,45 @@ class ApiRequestError extends Error {
   }
 }
 
-const previewGuestStorageKey = 'vaylakaverit.previewGuestId';
+const guestSessionStorageKey = 'vaylakaverit.guestSession';
+const guestSessionInvalidEvent = 'vaylakaverit:guest-session-invalid';
 
-function previewGuestId(): string {
-  const storedGuestId = window.localStorage.getItem(previewGuestStorageKey);
-  if (storedGuestId) {
-    return storedGuestId;
+function storedGuestSession(): GuestSession | null {
+  const serializedSession = window.localStorage.getItem(guestSessionStorageKey);
+  if (!serializedSession) {
+    return null;
   }
 
-  const guestId = crypto.randomUUID();
-  window.localStorage.setItem(previewGuestStorageKey, guestId);
-  return guestId;
+  try {
+    const session: unknown = JSON.parse(serializedSession);
+    if (
+      typeof session === 'object' &&
+      session !== null &&
+      'sessionToken' in session &&
+      'identityId' in session &&
+      'displayName' in session &&
+      'expiresAt' in session &&
+      typeof session.sessionToken === 'string' &&
+      typeof session.identityId === 'string' &&
+      typeof session.displayName === 'string' &&
+      typeof session.expiresAt === 'string'
+    ) {
+      return session as GuestSession;
+    }
+  } catch {
+    // Invalid device data is discarded before it can be sent as an authorization credential.
+  }
+
+  window.localStorage.removeItem(guestSessionStorageKey);
+  return null;
+}
+
+function saveGuestSession(session: GuestSession): void {
+  window.localStorage.setItem(guestSessionStorageKey, JSON.stringify(session));
+}
+
+function clearStoredGuestSession(): void {
+  window.localStorage.removeItem(guestSessionStorageKey);
 }
 
 async function request<T>(
@@ -117,7 +158,9 @@ async function request<T>(
     method,
     headers: {
       ...(body ? { 'content-type': 'application/json' } : {}),
-      'x-preview-guest-id': previewGuestId(),
+      ...(storedGuestSession()
+        ? { authorization: `Bearer ${storedGuestSession()!.sessionToken}` }
+        : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -128,6 +171,10 @@ async function request<T>(
       typeof payload === 'object' && payload !== null && 'error' in payload
         ? String(payload.error)
         : 'Pyyntö epäonnistui.';
+    if (response.status === 401) {
+      clearStoredGuestSession();
+      window.dispatchEvent(new Event(guestSessionInvalidEvent));
+    }
     throw new ApiRequestError(message, response.status, payload);
   }
   return payload as T;
@@ -197,23 +244,15 @@ function App() {
   const [joinInvitationToken, setJoinInvitationToken] = useState(() =>
     new URLSearchParams(window.location.search).get('join'),
   );
-  const [name, setName] = useState('');
+  const [guestSession, setGuestSession] = useState<GuestSession | null>(() => storedGuestSession());
+  const [name, setName] = useState(() => storedGuestSession()?.displayName ?? '');
   const [round, setRound] = useState<PreviewRound | null>(null);
-  const [invitationRound, setInvitationRound] = useState<PreviewRound | null>(null);
+  const [invitation, setInvitation] = useState<InvitationLookup | null>(null);
   const [completedRounds, setCompletedRounds] = useState<CompletedPreviewRound[]>([]);
   const [completedRound, setCompletedRound] = useState<CompletedPreviewRound | null>(null);
   const [activePlayerId, setActivePlayerId] = useState<string | null>(null);
   const [manualJoin, setManualJoin] = useState(false);
   const [joinLink, setJoinLink] = useState('');
-  const [handicapIndex, setHandicapIndex] = useState(18);
-  const [teeLabel, setTeeLabel] = useState('52');
-  const [ratingTable, setRatingTable] = useState<'men' | 'women'>('men');
-  const [gameMode, setGameMode] = useState<'scratch' | 'handicap'>('scratch');
-  const [gameHoleTieRule, setGameHoleTieRule] = useState<'no-winner' | 'carry-forward'>(
-    'no-winner',
-  );
-  const [gameEndTieRule, setGameEndTieRule] = useState<'draw' | 'continue'>('draw');
-  const [reward, setReward] = useState('');
   const [holeNumber, setHoleNumber] = useState(1);
   const [strokes, setStrokes] = useState(5);
   const [sideGameHoles, setSideGameHoles] = useState(3);
@@ -239,6 +278,8 @@ function App() {
     'connecting' | 'live' | 'polling' | 'reconnecting'
   >('connecting');
   const replayInProgress = useRef(false);
+  const startHeadingRef = useRef<HTMLHeadingElement>(null);
+  const guestNameRef = useRef<HTMLInputElement>(null);
 
   const joinUrl = round ? new URL(round.joinLink, window.location.origin).toString() : '';
   const canShareInvitation = round ? isInvitationValid(round) : false;
@@ -247,6 +288,11 @@ function App() {
     round?.creatorIdentityId;
 
   useEffect(() => {
+    if (!guestSession) {
+      setCompletedRounds([]);
+      return undefined;
+    }
+
     let active = true;
 
     void request<CompletedPreviewRound[]>('/api/preview/completed-rounds')
@@ -260,7 +306,7 @@ function App() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [guestSession?.sessionToken]);
 
   useEffect(() => {
     if (!joinInvitationToken || round) {
@@ -268,12 +314,12 @@ function App() {
     }
 
     let active = true;
-    void request<PreviewRound>(
+    void request<InvitationLookup>(
       `/api/preview/invitations/${encodeURIComponent(joinInvitationToken)}`,
     )
-      .then((invitedRound) => {
+      .then((invitationResult) => {
         if (active) {
-          setInvitationRound(invitedRound);
+          setInvitation(invitationResult);
         }
       })
       .catch((requestError: unknown) => {
@@ -288,6 +334,22 @@ function App() {
       active = false;
     };
   }, [joinInvitationToken, round]);
+
+  useEffect(() => {
+    const handleInvalidGuestSession = () => {
+      setGuestSession(null);
+      setRound(null);
+      setCompletedRound(null);
+      setActivePlayerId(null);
+      setPendingScoreChanges([]);
+      setError('Tämän selaimen vierasistunto on vanhentunut. Kirjoita nimi jatkaaksesi.');
+      void clearPendingScoreChanges().catch(() => undefined);
+      window.setTimeout(() => startHeadingRef.current?.focus(), 0);
+    };
+
+    window.addEventListener(guestSessionInvalidEvent, handleInvalidGuestSession);
+    return () => window.removeEventListener(guestSessionInvalidEvent, handleInvalidGuestSession);
+  }, []);
 
   useEffect(() => {
     if (!round || !activePlayerId) {
@@ -467,21 +529,17 @@ function App() {
     setError(null);
 
     try {
-      const createdRound = await request<PreviewRound>('/api/preview/rounds', {
-        name,
-        handicapIndex,
-        teeLabel,
-        ratingTable,
-        mode: gameMode,
-        reward,
-        holeTieRule: gameHoleTieRule,
-        endTieRule: gameEndTieRule,
-      });
+      const session = await ensureGuestSession();
+      const createdRound = await request<PreviewRound>('/api/preview/rounds', {});
       setRound(createdRound);
-      setActivePlayerId(createdRound.players[0]?.id ?? null);
+      setActivePlayerId(
+        createdRound.players.find((player) => player.identityId === session.identityId)?.id ?? null,
+      );
       setCopied(false);
+      window.setTimeout(() => startHeadingRef.current?.focus(), 0);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Kierrosta ei voitu luoda.');
+      window.setTimeout(() => guestNameRef.current?.focus(), 0);
     }
   }
 
@@ -497,26 +555,23 @@ function App() {
     }
 
     try {
+      const session = await ensureGuestSession();
       const joinedRound = await request<PreviewRound>(
         `/api/preview/invitations/${encodeURIComponent(invitationToken)}/join`,
-        {
-          name,
-          handicapIndex,
-          teeLabel,
-          ratingTable,
-        },
+        {},
       );
       setRound(joinedRound);
-      setInvitationRound(null);
+      setInvitation(null);
       setCopied(false);
       setActivePlayerId(
-        joinedRound.players.find((player) => player.identityId === `guest:${previewGuestId()}`)
-          ?.id ?? null,
+        joinedRound.players.find((player) => player.identityId === session.identityId)?.id ?? null,
       );
+      window.setTimeout(() => startHeadingRef.current?.focus(), 0);
     } catch (requestError) {
       setError(
         requestError instanceof Error ? requestError.message : 'Kierrokseen ei voitu liittyä.',
       );
+      window.setTimeout(() => guestNameRef.current?.focus(), 0);
     }
   }
 
@@ -754,22 +809,71 @@ function App() {
     setNotice(null);
     setDeletingData(true);
     try {
-      await request<{ anonymizedRoundCount: number }>('/api/account', undefined, 'DELETE');
+      await request<{ anonymizedRoundCount: number }>('/api/guest-data', undefined, 'DELETE');
       await clearPendingScoreChanges();
-      window.localStorage.removeItem(previewGuestStorageKey);
+      clearStoredGuestSession();
+      setGuestSession(null);
       setPendingScoreChanges([]);
       setRound(null);
       setCompletedRound(null);
       setActivePlayerId(null);
       setName('');
       setNotice(
-        'Tietosi on poistettu. Yhteisissä kierroksissa nimesi on anonymisoitu ja muut tulokset säilyvät.',
+        'Vierastietosi poistettiin. Yhteisissä kierroksissa nimesi anonymisoitiin ja muut tulokset säilyvät.',
       );
+      window.setTimeout(() => startHeadingRef.current?.focus(), 0);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Tietoja ei voitu poistaa.');
     } finally {
       setDeletingData(false);
     }
+  }
+
+  async function clearDeviceData() {
+    if (
+      !window.confirm(
+        'Tyhjennetäänkö tämän laitteen tiedot? Vierasistunto ja tallentamattomat tulokset poistetaan tältä selaimelta. Yhteiset kierrokset säilyvät muille pelaajille.',
+      )
+    ) {
+      return;
+    }
+
+    setError(null);
+    setNotice(null);
+    setDeletingData(true);
+    try {
+      await request<{ cleared: true }>('/api/guest-session', undefined, 'DELETE');
+      await clearPendingScoreChanges();
+      clearStoredGuestSession();
+      setGuestSession(null);
+      setRound(null);
+      setCompletedRound(null);
+      setActivePlayerId(null);
+      setPendingScoreChanges([]);
+      setName('');
+      setNotice('Tämän laitteen vierastiedot tyhjennettiin.');
+      window.setTimeout(() => startHeadingRef.current?.focus(), 0);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Laitteen tietoja ei voitu tyhjentää.',
+      );
+    } finally {
+      setDeletingData(false);
+    }
+  }
+
+  async function ensureGuestSession(): Promise<GuestSession> {
+    if (guestSession) {
+      return guestSession;
+    }
+
+    const session = await request<GuestSession>('/api/guest-sessions', { displayName: name });
+    saveGuestSession(session);
+    setGuestSession(session);
+    setName(session.displayName);
+    return session;
   }
 
   const handleQrScan = useCallback((value: string) => {
@@ -798,7 +902,11 @@ function App() {
       <header className="flex items-center justify-between">
         <div>
           <p className="text-sm font-semibold tracking-[0.16em] text-[#386354]">VÄYLÄKAVERIT</p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight text-[#073b2d]">
+          <h1
+            className="mt-1 text-3xl font-bold tracking-tight text-[#073b2d]"
+            ref={startHeadingRef}
+            tabIndex={-1}
+          >
             {completedRound
               ? 'Kierroksen historia'
               : round
@@ -814,7 +922,7 @@ function App() {
         <CompletedRoundHistory round={completedRound} onBack={() => setCompletedRound(null)} />
       ) : !round ? (
         <>
-          <section className="mt-10 rounded-3xl bg-[#073b2d] p-6 text-white shadow-lg shadow-[#073b2d]/15">
+          <Card className="mt-10 bg-[#073b2d] p-6 text-white shadow-lg shadow-[#073b2d]/15">
             <p className="text-sm font-semibold text-[#d4e5d9]">
               {joinInvitationToken || manualJoin ? 'LIITY KIERROKSEEN' : 'LUO UUSI KIERROS'}
             </p>
@@ -826,17 +934,10 @@ function App() {
             <p className="mt-3 text-base leading-7 text-[#d4e5d9]">
               Golf Talma Master, tii 52 ja pelaajat samalle kierrokselle liittymislinkillä.
             </p>
-            {invitationRound ? (
+            {invitation ? (
               <div className="mt-4 rounded-xl bg-white/10 px-4 py-3 text-sm text-[#d4e5d9]">
-                <p className="font-semibold text-white">{invitationRound.courseName}</p>
-                <p className="mt-1">
-                  {invitationRound.players.length} / 4 pelaajaa ·{' '}
-                  {invitationRound.standings.completedHoles} reikää pelattu
-                </p>
-                <p className="mt-2">
-                  Katselet kierrosta kutsulinkillä. Liity tallentaaksesi tuloksia.
-                </p>
-                <PublicRoundView round={invitationRound} />
+                <p className="font-semibold text-white">Liity kaverin kierrokseen.</p>
+                <p className="mt-1">Näet kierroksen tiedot, kun olet liittynyt siihen.</p>
               </div>
             ) : null}
             <form
@@ -872,140 +973,34 @@ function App() {
                   </label>
                 </>
               ) : null}
-              <label className="grid gap-2 text-sm font-semibold" htmlFor="player-name">
-                Oma nimi
-                <input
-                  id="player-name"
-                  className="min-h-12 rounded-xl bg-white px-3 text-base text-[#13251f]"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="Esim. Aleksi"
-                  required
-                />
-              </label>
-              <label className="grid gap-2 text-sm font-semibold" htmlFor="handicap-index">
-                Tasoitusindeksi
-                <input
-                  id="handicap-index"
-                  className="min-h-12 rounded-xl bg-white px-3 text-base text-[#13251f]"
-                  type="number"
-                  step="0.1"
-                  value={handicapIndex}
-                  onChange={(event) => setHandicapIndex(Number(event.target.value))}
-                />
-              </label>
-              <label className="grid gap-2 text-sm font-semibold" htmlFor="tee-label">
-                Tii
-                <select
-                  id="tee-label"
-                  className="min-h-12 rounded-xl bg-white px-3 text-base text-[#13251f]"
-                  value={teeLabel}
-                  onChange={(event) => setTeeLabel(event.target.value)}
-                >
-                  {['48', '52', '56', '60', '64'].map((label) => (
-                    <option key={label} value={label}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="grid gap-2 text-sm font-semibold" htmlFor="rating-table">
-                Pelitasoitustaulukko
-                <select
-                  id="rating-table"
-                  className="min-h-12 rounded-xl bg-white px-3 text-base text-[#13251f]"
-                  value={ratingTable}
-                  onChange={(event) =>
-                    setRatingTable(event.target.value === 'women' ? 'women' : 'men')
-                  }
-                >
-                  <option value="men">Miesten taulukko</option>
-                  <option value="women">Naisten taulukko</option>
-                </select>
-              </label>
-              {!joinInvitationToken && !manualJoin ? (
-                <>
-                  <label className="grid gap-2 text-sm font-semibold" htmlFor="game-mode">
-                    Pelimuoto
-                    <select
-                      id="game-mode"
-                      className="min-h-12 rounded-xl bg-white px-3 text-base text-[#13251f]"
-                      value={gameMode}
-                      onChange={(event) =>
-                        setGameMode(event.target.value === 'handicap' ? 'handicap' : 'scratch')
-                      }
-                    >
-                      <option value="scratch">Scratch-reikäpeli</option>
-                      <option value="handicap">Tasoituksellinen reikäpeli</option>
-                    </select>
-                  </label>
-                  <label className="grid gap-2 text-sm font-semibold" htmlFor="reward">
-                    Palkinto (valinnainen)
-                    <input
-                      id="reward"
-                      className="min-h-12 rounded-xl bg-white px-3 text-base text-[#13251f]"
-                      value={reward}
-                      onChange={(event) => setReward(event.target.value)}
-                      placeholder="Esim. voittajalle olut"
-                    />
-                  </label>
-                  <label className="grid gap-2 text-sm font-semibold" htmlFor="game-hole-tie-rule">
-                    Tasatuloksen sääntö reiällä
-                    <select
-                      id="game-hole-tie-rule"
-                      className="min-h-12 rounded-xl bg-white px-3 text-base text-[#13251f]"
-                      value={gameHoleTieRule}
-                      onChange={(event) =>
-                        setGameHoleTieRule(
-                          event.target.value === 'carry-forward' ? 'carry-forward' : 'no-winner',
-                        )
-                      }
-                    >
-                      <option value="no-winner">Tasatuloksesta ei voittoa</option>
-                      <option value="carry-forward">Voitto siirtyy seuraavalle reiälle</option>
-                    </select>
-                  </label>
-                  {gameHoleTieRule === 'carry-forward' ? (
-                    <p className="text-sm text-[#d4e5d9]">
-                      Kierroksen luoja on valittu ratkaisemaan siirtyvän voiton.
-                    </p>
-                  ) : null}
-                  <label className="grid gap-2 text-sm font-semibold" htmlFor="game-end-tie-rule">
-                    Tasatulos pelin lopussa
-                    <select
-                      id="game-end-tie-rule"
-                      className="min-h-12 rounded-xl bg-white px-3 text-base text-[#13251f]"
-                      value={gameEndTieRule}
-                      onChange={(event) =>
-                        setGameEndTieRule(event.target.value === 'continue' ? 'continue' : 'draw')
-                      }
-                    >
-                      <option value="draw">Merkitään tasapeliksi</option>
-                      <option value="continue">Jatketaan reikä kerrallaan</option>
-                    </select>
-                  </label>
-                </>
-              ) : null}
-              <button
-                type="submit"
-                className="min-h-12 rounded-xl bg-[#e5b700] px-4 py-3 font-bold text-[#17231c]"
-              >
+              <TextField
+                id="player-name"
+                inputRef={guestNameRef}
+                label="Nimi kierrokselle"
+                hint="Kirjoita nimi, jolla muut pelaajat tunnistavat sinut. Nimesi tallennetaan tälle selaimelle. Et tarvitse tiliä tai salasanaa."
+                className="bg-white text-base text-[#13251f]"
+                maxLength={40}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Esim. Aleksi"
+                required
+                value={name}
+              />
+              <Action type="submit">
                 {joinInvitationToken || manualJoin ? 'Liity kierrokseen' : 'Luo kierros'}
-              </button>
+              </Action>
               {!joinInvitationToken ? (
-                <button
-                  type="button"
-                  className="min-h-12 rounded-xl border border-[#d4e5d9] px-4 py-3 font-bold text-white"
+                <Action
+                  tone="secondary"
                   onClick={() => {
                     setError(null);
                     setManualJoin((value) => !value);
                   }}
                 >
                   {manualJoin ? 'Luo uusi kierros' : 'Liity kierrokseen'}
-                </button>
+                </Action>
               ) : null}
             </form>
-          </section>
+          </Card>
 
           {completedRounds.length > 0 ? (
             <section className="mt-5 rounded-3xl border border-[#d8e2d8] bg-white p-5 shadow-sm">
@@ -1382,32 +1377,28 @@ function App() {
       )}
 
       {error ? (
-        <p
-          role="alert"
-          className="mt-5 rounded-2xl bg-[#fee8e5] px-4 py-3 text-sm font-medium text-[#8a2e22]"
-        >
+        <StatusMessage className="mt-5" tone="error">
           {error}
-        </p>
+        </StatusMessage>
       ) : null}
       {notice ? (
-        <p
-          role="status"
-          className="mt-5 rounded-2xl bg-[#d4e5d9] px-4 py-3 text-sm font-medium text-[#245642]"
-        >
+        <StatusMessage className="mt-5" tone="success">
           {notice}
-        </p>
+        </StatusMessage>
       ) : null}
 
       <footer className="mt-auto pt-10 text-center text-sm text-[#62776c]">
         <p>Ensimmäinen kenttä: Golf Talma Master</p>
-        <button
-          type="button"
-          className="mt-3 min-h-11 font-semibold text-[#245642] underline disabled:opacity-60"
-          disabled={deletingData}
-          onClick={() => void deleteData()}
-        >
-          {deletingData ? 'Poistetaan tietoja…' : 'Poista tietoni'}
-        </button>
+        {guestSession ? (
+          <div className="mt-3 grid gap-3">
+            <Action disabled={deletingData} onClick={() => void clearDeviceData()} tone="secondary">
+              {deletingData ? 'Tyhjennetään tietoja…' : 'Tyhjennä tämän laitteen tiedot'}
+            </Action>
+            <Action disabled={deletingData} onClick={() => void deleteData()}>
+              {deletingData ? 'Poistetaan tietoja…' : 'Poista vierastietoni'}
+            </Action>
+          </div>
+        ) : null}
       </footer>
     </main>
   );
@@ -1417,25 +1408,6 @@ function isInvitationValid(
   round: Pick<PreviewRound, 'invitationExpiresAt' | 'invitationRevokedAt'>,
 ) {
   return !round.invitationRevokedAt && new Date(round.invitationExpiresAt).getTime() > Date.now();
-}
-
-function PublicRoundView({ round }: { round: PreviewRound }) {
-  return (
-    <div className="mt-4 rounded-xl bg-white/10 px-3 py-3 text-sm">
-      <p className="font-semibold text-white">Kierroksen tilanne</p>
-      <ul className="mt-2 grid gap-1">
-        {round.players.map((player) => (
-          <li key={player.id} className="flex justify-between gap-3">
-            <span>{player.name}</span>
-            <span>{round.standings.winsByPlayerId[player.id] ?? 0} voittoa</span>
-          </li>
-        ))}
-      </ul>
-      <p className="mt-3 text-[#d4e5d9]">
-        Tämä on vain luku -näkymä. Liity kierrokseen, jos haluat tallentaa oman tuloksesi.
-      </p>
-    </div>
-  );
 }
 
 function RoundLobby({

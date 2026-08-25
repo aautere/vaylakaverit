@@ -21,14 +21,14 @@ describe('round update transports', () => {
     });
 
     await transport.publish('round-1');
-    await expect(transport.createConnection('round-1', 'apple:aino')).resolves.toEqual({
+    await expect(transport.createConnection('round-1', 'guest:aino')).resolves.toEqual({
       kind: 'web-pubsub',
       url: 'wss://example.test/token',
     });
 
     expect(sendToAll).toHaveBeenCalledWith({ type: 'round.updated', roundId: 'round-1' });
     expect(getClientAccessToken).toHaveBeenCalledWith({
-      userId: 'apple:aino',
+      userId: 'guest:aino',
       groups: [roundGroup('round-1')],
       expirationTimeInMinutes: 10,
     });

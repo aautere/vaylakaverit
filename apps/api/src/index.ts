@@ -4,8 +4,8 @@ import {
   type HttpResponseInit,
   type InvocationContext,
 } from '@azure/functions';
-import { UnavailableAppleTokenVerifier } from './auth/apple.js';
 import { readAuthConfig } from './auth/config.js';
+import { createGuestSessionStore } from './auth/create-guest-session-store.js';
 import { IdentityService } from './auth/identity.js';
 import { readLiveUpdateConfig } from './live-updates/config.js';
 import { createRoundUpdateTransport } from './live-updates/round-update-transport.js';
@@ -13,7 +13,8 @@ import { createRoundStore } from './store/create-round-store.js';
 import { ScoreRevisionConflictError } from './store/round-store.js';
 
 const roundStore = createRoundStore();
-const identityService = new IdentityService(readAuthConfig(), new UnavailableAppleTokenVerifier());
+readAuthConfig();
+export const identityService = new IdentityService(createGuestSessionStore());
 const roundUpdateTransport = createRoundUpdateTransport(readLiveUpdateConfig());
 const webOrigin = process.env.WEB_ORIGIN ?? 'http://127.0.0.1:5173';
 
@@ -41,7 +42,7 @@ function json(body: unknown, status = 200): HttpResponseInit {
     status,
     headers: {
       'access-control-allow-origin': webOrigin,
-      'access-control-allow-headers': 'authorization,content-type,x-preview-guest-id',
+      'access-control-allow-headers': 'authorization,content-type',
       'content-type': 'application/json',
     },
     jsonBody: body,
@@ -63,55 +64,79 @@ app.http('apiOptions', {
     headers: {
       'access-control-allow-origin': webOrigin,
       'access-control-allow-methods': 'GET,POST,DELETE,OPTIONS',
-      'access-control-allow-headers': 'authorization,content-type,x-preview-guest-id',
+      'access-control-allow-headers': 'authorization,content-type',
     },
   }),
 });
+
+app.http('createGuestSession', {
+  methods: ['POST'],
+  authLevel: 'anonymous',
+  route: 'guest-sessions',
+  handler: createGuestSessionHandler,
+});
+
+export async function createGuestSessionHandler(request: HttpRequest): Promise<HttpResponseInit> {
+  const body = await requestBody(request);
+  const displayName = typeof body.displayName === 'string' ? body.displayName : '';
+
+  try {
+    const session = await identityService.createGuestSession(displayName);
+    return json(
+      {
+        sessionToken: session.sessionToken,
+        identityId: session.identityId,
+        displayName: session.displayName,
+        expiresAt: session.expiresAt.toISOString(),
+      },
+      201,
+    );
+  } catch (error) {
+    return json({ error: handicapErrorMessage(error) }, 400);
+  }
+}
 
 app.http('createPreviewRound', {
   methods: ['POST'],
   authLevel: 'anonymous',
   route: 'preview/rounds',
-  handler: async (request) => {
-    const session = identityService.sessionFromRequest(request);
-    if (!session) {
-      return json({ error: 'Tunnistautuminen vaaditaan.' }, 401);
-    }
-
-    const body = await requestBody(request);
-    const name = typeof body.name === 'string' ? body.name : '';
-    const handicapIndex = typeof body.handicapIndex === 'number' ? body.handicapIndex : 18;
-    const teeLabel = typeof body.teeLabel === 'string' ? body.teeLabel : undefined;
-    const ratingTable = typeof body.ratingTable === 'string' ? body.ratingTable : undefined;
-    const mode = body.mode === 'handicap' ? 'handicap' : 'scratch';
-    const reward = typeof body.reward === 'string' ? body.reward : '';
-    const holeTieRule = body.holeTieRule === 'carry-forward' ? 'carry-forward' : 'no-winner';
-    const endTieRule = body.endTieRule === 'continue' ? 'continue' : 'draw';
-
-    if (!name.trim()) {
-      return json({ error: 'Anna pelaajan nimi.' }, 400);
-    }
-
-    try {
-      return json(
-        await roundStore.create({
-          identityId: session.subject,
-          name: name.trim(),
-          handicapIndex,
-          teeLabel,
-          ratingTable,
-          mode,
-          reward: reward.trim(),
-          holeTieRule,
-          endTieRule,
-        }),
-        201,
-      );
-    } catch (error) {
-      return json({ error: handicapErrorMessage(error) }, 400);
-    }
-  },
+  handler: createPreviewRoundHandler,
 });
+
+export async function createPreviewRoundHandler(request: HttpRequest): Promise<HttpResponseInit> {
+  const session = await identityService.sessionFromRequest(request);
+  if (!session) {
+    return json({ error: 'Tunnistautuminen vaaditaan.' }, 401);
+  }
+
+  const body = await requestBody(request);
+  const handicapIndex = typeof body.handicapIndex === 'number' ? body.handicapIndex : 18;
+  const teeLabel = typeof body.teeLabel === 'string' ? body.teeLabel : undefined;
+  const ratingTable = typeof body.ratingTable === 'string' ? body.ratingTable : undefined;
+  const mode = body.mode === 'handicap' ? 'handicap' : 'scratch';
+  const reward = typeof body.reward === 'string' ? body.reward : '';
+  const holeTieRule = body.holeTieRule === 'carry-forward' ? 'carry-forward' : 'no-winner';
+  const endTieRule = body.endTieRule === 'continue' ? 'continue' : 'draw';
+
+  try {
+    return json(
+      await roundStore.create({
+        identityId: session.subject,
+        name: session.displayName,
+        handicapIndex,
+        teeLabel,
+        ratingTable,
+        mode,
+        reward: reward.trim(),
+        holeTieRule,
+        endTieRule,
+      }),
+      201,
+    );
+  } catch (error) {
+    return json({ error: handicapErrorMessage(error) }, 400);
+  }
+}
 
 app.http('getPreviewRound', {
   methods: ['GET'],
@@ -121,7 +146,7 @@ app.http('getPreviewRound', {
 });
 
 export async function getPreviewRoundHandler(request: HttpRequest): Promise<HttpResponseInit> {
-  const session = identityService.sessionFromRequest(request);
+  const session = await identityService.sessionFromRequest(request);
   if (!session) {
     return json({ error: 'Tunnistautuminen vaaditaan.' }, 401);
   }
@@ -153,14 +178,20 @@ export async function getPreviewInvitationHandler(request: HttpRequest): Promise
     : undefined;
 
   return round
-    ? json(round)
+    ? json({ invitationToken, joinRequired: true })
     : json({ error: 'Kutsulinkki ei ole voimassa tai kierros on päättynyt.' }, 404);
 }
 
 export async function listCompletedPreviewRoundsHandler(
-  _request: HttpRequest,
+  request: HttpRequest,
 ): Promise<HttpResponseInit> {
-  return json(await roundStore.history());
+  const session = await identityService.sessionFromRequest(request);
+  if (!session) {
+    return json({ error: 'Tunnistautuminen vaaditaan.' }, 401);
+  }
+
+  const rounds = await roundStore.history();
+  return json(rounds.filter((round) => isRoundParticipant(round, session.subject)));
 }
 
 app.http('listCompletedPreviewRounds', {
@@ -173,9 +204,20 @@ app.http('listCompletedPreviewRounds', {
 export async function getCompletedPreviewRoundHandler(
   request: HttpRequest,
 ): Promise<HttpResponseInit> {
+  const session = await identityService.sessionFromRequest(request);
+  if (!session) {
+    return json({ error: 'Tunnistautuminen vaaditaan.' }, 401);
+  }
+
   const roundId = request.params.roundId;
   const round = roundId ? await roundStore.getHistory(roundId) : undefined;
-  return round ? json(round) : json({ error: 'Valmista kierrosta ei löytynyt.' }, 404);
+  if (!round) {
+    return json({ error: 'Valmista kierrosta ei löytynyt.' }, 404);
+  }
+  if (!isRoundParticipant(round, session.subject)) {
+    return json({ error: 'Liity kierrokseen nähdäksesi sen tiedot.' }, 403);
+  }
+  return json(round);
 }
 
 app.http('getCompletedPreviewRound', {
@@ -186,7 +228,7 @@ app.http('getCompletedPreviewRound', {
 });
 
 export async function completePreviewRoundHandler(request: HttpRequest): Promise<HttpResponseInit> {
-  const session = identityService.sessionFromRequest(request);
+  const session = await identityService.sessionFromRequest(request);
   if (!session) {
     return json({ error: 'Tunnistautuminen vaaditaan.' }, 401);
   }
@@ -220,7 +262,7 @@ app.http('joinPreviewRound', {
 });
 
 export async function joinPreviewRoundHandler(request: HttpRequest): Promise<HttpResponseInit> {
-  const session = identityService.sessionFromRequest(request);
+  const session = await identityService.sessionFromRequest(request);
   if (!session) {
     return json({ error: 'Tunnistautuminen vaaditaan.' }, 401);
   }
@@ -235,7 +277,6 @@ export async function joinPreviewRoundHandler(request: HttpRequest): Promise<Htt
   }
 
   const body = await requestBody(request);
-  const name = typeof body.name === 'string' ? body.name : '';
   const handicapIndex = typeof body.handicapIndex === 'number' ? body.handicapIndex : 18;
   const teeLabel = typeof body.teeLabel === 'string' ? body.teeLabel : undefined;
   const ratingTable = typeof body.ratingTable === 'string' ? body.ratingTable : undefined;
@@ -245,7 +286,7 @@ export async function joinPreviewRoundHandler(request: HttpRequest): Promise<Htt
       roundId: invitedRound.id,
       invitationToken,
       identityId: session.subject,
-      name: name.trim(),
+      name: session.displayName,
       handicapIndex,
       teeLabel,
       ratingTable,
@@ -260,10 +301,7 @@ export async function joinPreviewRoundHandler(request: HttpRequest): Promise<Htt
       return json({ error: 'Kutsulinkki ei ole enää voimassa.' }, 404);
     }
     if (currentInvitation.players.length >= 4) {
-      return json(
-        { error: 'Kierros on täynnä. Voit silti katsella kierrosta kutsulinkillä.' },
-        409,
-      );
+      return json({ error: 'Kierros on täynnä.' }, 409);
     }
     return json({ error: 'Kierrokseen ei voi liittyä.' }, 400);
   }
@@ -282,7 +320,7 @@ app.http('revokePreviewInvitation', {
 export async function revokePreviewInvitationHandler(
   request: HttpRequest,
 ): Promise<HttpResponseInit> {
-  const session = identityService.sessionFromRequest(request);
+  const session = await identityService.sessionFromRequest(request);
   if (!session) {
     return json({ error: 'Tunnistautuminen vaaditaan.' }, 401);
   }
@@ -290,6 +328,13 @@ export async function revokePreviewInvitationHandler(
   const roundId = request.params.roundId;
   if (!roundId) {
     return json({ error: 'Kierrosta ei löytynyt.' }, 404);
+  }
+  const round = await roundStore.get(roundId);
+  if (!round) {
+    return json({ error: 'Kierrosta ei löytynyt.' }, 404);
+  }
+  if (!isRoundParticipant(round, session.subject)) {
+    return json({ error: 'Liity kierrokseen nähdäksesi sen tiedot.' }, 403);
   }
 
   const revokedRound = await roundStore.revokeInvitation({
@@ -314,7 +359,7 @@ app.http('updatePreviewRoundPlayer', {
 export async function updatePreviewRoundPlayerHandler(
   request: HttpRequest,
 ): Promise<HttpResponseInit> {
-  const session = identityService.sessionFromRequest(request);
+  const session = await identityService.sessionFromRequest(request);
   if (!session) {
     return json({ error: 'Tunnistautuminen vaaditaan.' }, 401);
   }
@@ -371,7 +416,7 @@ app.http('startPreviewRound', {
 });
 
 export async function startPreviewRoundHandler(request: HttpRequest): Promise<HttpResponseInit> {
-  const session = identityService.sessionFromRequest(request);
+  const session = await identityService.sessionFromRequest(request);
   if (!session) {
     return json({ error: 'Tunnistautuminen vaaditaan.' }, 401);
   }
@@ -380,6 +425,9 @@ export async function startPreviewRoundHandler(request: HttpRequest): Promise<Ht
   const round = roundId ? await roundStore.get(roundId) : undefined;
   if (!round) {
     return json({ error: 'Kierrosta ei löytynyt.' }, 404);
+  }
+  if (!isRoundParticipant(round, session.subject)) {
+    return json({ error: 'Liity kierrokseen nähdäksesi sen tiedot.' }, 403);
   }
   if (round.creatorIdentityId !== session.subject) {
     return json({ error: 'Vain kierroksen luoja voi aloittaa kierroksen.' }, 403);
@@ -401,7 +449,7 @@ export async function startPreviewRoundHandler(request: HttpRequest): Promise<Ht
 }
 
 export async function recordPreviewScoreHandler(request: HttpRequest): Promise<HttpResponseInit> {
-  const session = identityService.sessionFromRequest(request);
+  const session = await identityService.sessionFromRequest(request);
   if (!session) {
     return json({ error: 'Tunnistautuminen vaaditaan.' }, 401);
   }
@@ -475,40 +523,38 @@ app.http('recordPreviewScore', {
   handler: recordPreviewScoreHandler,
 });
 
-app.http('signInWithApple', {
-  methods: ['POST'],
-  authLevel: 'anonymous',
-  route: 'auth/apple',
-  handler: async (request) => {
-    const body = await requestBody(request);
-    const identityToken = typeof body.identityToken === 'string' ? body.identityToken : '';
-
-    if (!identityToken) {
-      return json({ error: 'Apple identity token is required.' }, 400);
-    }
-
-    try {
-      return json(await identityService.signInWithApple(identityToken));
-    } catch {
-      return json({ error: 'Sign in with Apple is not configured for this environment.' }, 501);
-    }
-  },
-});
-
-app.http('deleteAccount', {
+app.http('clearGuestSession', {
   methods: ['DELETE'],
   authLevel: 'anonymous',
-  route: 'account',
-  handler: deleteAccountHandler,
+  route: 'guest-session',
+  handler: clearGuestSessionHandler,
 });
 
-export async function deleteAccountHandler(request: HttpRequest): Promise<HttpResponseInit> {
-  const session = identityService.sessionFromRequest(request);
+export async function clearGuestSessionHandler(request: HttpRequest): Promise<HttpResponseInit> {
+  const session = await identityService.sessionFromRequest(request);
+  if (!session) {
+    return json({ error: 'Tunnistautuminen vaaditaan.' }, 401);
+  }
+
+  await identityService.revokeSession(session);
+  return json({ cleared: true });
+}
+
+app.http('deleteGuestData', {
+  methods: ['DELETE'],
+  authLevel: 'anonymous',
+  route: 'guest-data',
+  handler: deleteGuestDataHandler,
+});
+
+export async function deleteGuestDataHandler(request: HttpRequest): Promise<HttpResponseInit> {
+  const session = await identityService.sessionFromRequest(request);
   if (!session) {
     return json({ error: 'Tunnistautuminen vaaditaan.' }, 401);
   }
 
   const result = await roundStore.deleteIdentity(session.subject);
+  await identityService.revokeSession(session);
   return json(result);
 }
 
@@ -517,7 +563,7 @@ app.http('addPreviewSideGame', {
   authLevel: 'anonymous',
   route: 'preview/rounds/{roundId}/side-games',
   handler: async (request) => {
-    const session = identityService.sessionFromRequest(request);
+    const session = await identityService.sessionFromRequest(request);
     if (!session) {
       return json({ error: 'Tunnistautuminen vaaditaan.' }, 401);
     }
@@ -578,7 +624,7 @@ app.http('getRoundLiveConnection', {
 export async function getRoundLiveConnectionHandler(
   request: HttpRequest,
 ): Promise<HttpResponseInit> {
-  const session = identityService.sessionFromRequest(request);
+  const session = await identityService.sessionFromRequest(request);
   if (!session) {
     return json({ error: 'Tunnistautuminen vaaditaan.' }, 401);
   }

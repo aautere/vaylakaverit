@@ -54,20 +54,21 @@ required locally. To use Cosmos DB in a deployed environment, set `ROUND_STORE=c
 Cosmos with `DefaultAzureCredential`; configure the Function App's managed identity with Cosmos
 data-plane access rather than a connection key.
 
-Local preview also defaults to `AUTH_MODE=preview`. It creates a device-local guest identity and
-does not need Apple or Azure credentials. A deployed Apple-authentication seam requires
-`AUTH_MODE=apple`, `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`, and a
-32-character-or-longer `SESSION_JWT_SECRET`, all supplied through secure runtime configuration.
-The current seam deliberately rejects Apple sign-in requests until a production Apple token
-verifier and real settings are supplied; it must not be presented as working Apple login.
+The API always uses guest sessions. A player provides a display name, and the browser stores an
+opaque credential for that browser profile; no password, email address, App Store account, Apple
+identity, or provider credential is required. The service expires an unused guest credential after
+180 days. **Clear data on this device** revokes its credential and clears pending local scores
+without changing shared rounds. **Delete guest data** also anonymizes the guest in shared rounds and
+cannot be undone.
 
 Preview also defaults to `ROUND_UPDATE_TRANSPORT=preview`. Joined browser sessions receive round
 updates by polling the authoritative snapshot once per second, without Azure credentials. Production
 uses `ROUND_UPDATE_TRANSPORT=web-pubsub`, `WEB_PUBSUB_ENDPOINT`, and `WEB_PUBSUB_HUB`; the Function
 App obtains Azure Web PubSub tokens and publishes only to `round:<round-id>` groups after verifying
 the caller is a participant. Assign the Function App managed identity the Azure Web PubSub service
-role required to generate client tokens and send group messages. Link-only viewers can still refresh
-the normal round snapshot but cannot obtain a live connection.
+role required to generate client tokens and send group messages. Invitation links and QR codes are
+join routes only: they do not disclose a round snapshot or provide a live connection until the
+guest has joined the round.
 
 ### Browser E2E
 
@@ -91,10 +92,10 @@ not required. On a new machine, install the local Chromium binary once with
 ## Azure and production caveats
 
 Local preview does not validate an Azure deployment. Before production release, manually verify
-Apple Sign In with production Apple credentials, Azure managed-identity permissions for Cosmos DB
-and Web PubSub, deployed PWA installation and updates on physical iPhone Safari, Azure monitoring
-and alerts, and GitHub branch protections/required checks. Never place Apple keys, session secrets,
-or Azure credentials in this repository.
+guest-session expiry and clear/delete recovery, Azure managed-identity permissions for Cosmos DB and
+Web PubSub, deployed PWA installation and updates on physical iPhone Safari, Azure monitoring and
+alerts, and GitHub branch protections/required checks. Never place credentials or production data in
+this repository.
 
 ## License
 

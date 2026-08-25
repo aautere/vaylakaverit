@@ -3,7 +3,7 @@
   "Values": {
     "AzureWebJobsStorage": "",
     "FUNCTIONS_WORKER_RUNTIME": "node",
-    "AUTH_MODE": "preview",
+    "AUTH_MODE": "guest",
     "ROUND_UPDATE_TRANSPORT": "preview"
   }
 }

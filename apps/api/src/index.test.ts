@@ -1,389 +1,253 @@
 import type { HttpRequest } from '@azure/functions';
 import { describe, expect, it } from 'vitest';
 import {
-  completePreviewRoundHandler,
-  deleteAccountHandler,
+  clearGuestSessionHandler,
+  createGuestSessionHandler,
+  createPreviewRoundHandler,
+  deleteGuestDataHandler,
+  getCompletedPreviewRoundHandler,
   getPreviewInvitationHandler,
   getPreviewRoundHandler,
   getRoundLiveConnectionHandler,
-  getCompletedPreviewRoundHandler,
+  identityService,
   joinPreviewRoundHandler,
   listCompletedPreviewRoundsHandler,
   recordPreviewScoreHandler,
   revokePreviewInvitationHandler,
-  startPreviewRoundHandler,
   updatePreviewRoundPlayerHandler,
 } from './index.js';
-import { createPreviewRound, joinPreviewRound, previewRoundStore } from './preview-store.js';
+import { previewRoundStore } from './preview-store.js';
 
-function requestFor(roundId: string, guestId?: string): HttpRequest {
-  return {
-    params: { roundId },
-    headers: new Headers(guestId ? { 'x-preview-guest-id': guestId } : {}),
-  } as unknown as HttpRequest;
+type Guest = { token: string; subject: string; displayName: string };
+
+async function guest(displayName: string): Promise<Guest> {
+  const created = await identityService.createGuestSession(displayName);
+  const session = await identityService.sessionFromRequest(requestFor('', created.sessionToken));
+  return { token: created.sessionToken, subject: session!.subject, displayName };
 }
 
-function scoreRequestFor(
+function requestFor(
   roundId: string,
-  playerId: string,
-  guestId: string,
-  expectedRevision = 0,
+  token: string,
+  body?: Record<string, unknown>,
+  params: Record<string, string> = {},
 ): HttpRequest {
   return {
-    params: { roundId },
-    headers: new Headers({ 'x-preview-guest-id': guestId }),
-    json: async () => ({ playerId, holeNumber: 1, strokes: 4, expectedRevision }),
+    params: { roundId, ...params },
+    headers: new Headers({ authorization: `Bearer ${token}` }),
+    json: async () => body ?? {},
   } as unknown as HttpRequest;
 }
 
-function playerSettingsRequest(
-  roundId: string,
-  playerId: string,
-  guestId: string,
-  settings: Record<string, unknown>,
-): HttpRequest {
-  return {
-    params: { roundId, playerId },
-    headers: new Headers({ 'x-preview-guest-id': guestId }),
-    json: async () => settings,
-  } as unknown as HttpRequest;
+async function createRound(creator: Guest) {
+  const response = await createPreviewRoundHandler(
+    requestFor('', creator.token, {
+      handicapIndex: 18,
+      ratingTable: 'men',
+      mode: 'scratch',
+      reward: '',
+    }),
+  );
+  return response.jsonBody as {
+    id: string;
+    invitationToken: string;
+    players: Array<{ id: string }>;
+  };
 }
 
-function startRequestFor(roundId: string, guestId: string): HttpRequest {
-  return {
-    params: { roundId },
-    headers: new Headers({ 'x-preview-guest-id': guestId }),
-  } as unknown as HttpRequest;
-}
+describe('guest-first round API', () => {
+  it('creates a validated guest session and makes that guest the first round participant', async () => {
+    const created = await createGuestSessionHandler({
+      headers: new Headers(),
+      json: async () => ({ displayName: '  Aino  ' }),
+    } as unknown as HttpRequest);
+    const createdGuest = created.jsonBody as { sessionToken: string; identityId: string };
+    const token = createdGuest.sessionToken;
+    const session = await identityService.sessionFromRequest(requestFor('', token));
+    const round = await createRound({ token, subject: session!.subject, displayName: 'Aino' });
 
-function readyRound(roundId: string) {
-  const round = previewRoundStore.get(roundId)!;
-  for (const player of round.players) {
-    previewRoundStore.updatePlayer({
-      roundId,
-      playerId: player.id,
-      identityId: player.identityId,
-      name: player.name,
-      handicapIndex: player.handicapIndex,
-      teeLabel: player.teeLabel,
-      ratingTable: player.ratingTable,
-      ready: true,
-    });
-  }
-  return previewRoundStore.start(roundId)!;
-}
-
-describe('completed round history API', () => {
-  it('finishes a round and exposes it through the completed-round endpoints', async () => {
-    const round = createPreviewRound('Aino', 18, 'scratch', '', 'guest:aino');
-    joinPreviewRound(round.id, 'Elli', 18, 'guest:elli');
-    readyRound(round.id);
-
-    const completed = await completePreviewRoundHandler(requestFor(round.id, 'aino'));
-    const history = await listCompletedPreviewRoundsHandler(requestFor(''));
-    const detail = await getCompletedPreviewRoundHandler(requestFor(round.id));
-
-    expect(completed.status).toBe(200);
-    expect(completed.jsonBody).toMatchObject({ id: round.id, outcome: { kind: 'draw' } });
-    expect(history.jsonBody).toEqual(
-      expect.arrayContaining([expect.objectContaining({ id: round.id })]),
-    );
-    expect(detail.jsonBody).toMatchObject({ id: round.id, courseName: 'Golf Talma Master' });
+    expect(created).toMatchObject({ status: 201, jsonBody: { displayName: 'Aino' } });
+    expect(createdGuest.identityId).toBe(session!.subject);
+    expect(round.players).toHaveLength(1);
+    expect(previewRoundStore.get(round.id)).toMatchObject({ creatorIdentityId: session!.subject });
   });
 
-  describe('account deletion authorization', () => {
-    it('rejects a deletion request without a valid authenticated session', async () => {
-      const deleted = await deleteAccountHandler({
-        headers: new Headers({ 'x-preview-guest-id': 'not valid' }),
-      } as unknown as HttpRequest);
+  it('does not disclose round data or live access from an invitation before joining', async () => {
+    const creator = await guest('Aino');
+    const visitor = await guest('Veera');
+    const round = await createRound(creator);
 
-      expect(deleted.status).toBe(401);
+    const invitation = await getPreviewInvitationHandler(
+      requestFor('', visitor.token, undefined, { invitationToken: round.invitationToken }),
+    );
+    const snapshot = await getPreviewRoundHandler(requestFor(round.id, visitor.token));
+    const live = await getRoundLiveConnectionHandler(requestFor(round.id, visitor.token));
+    const joined = await joinPreviewRoundHandler(
+      requestFor(
+        '',
+        visitor.token,
+        { handicapIndex: 18, ratingTable: 'women' },
+        {
+          invitationToken: round.invitationToken,
+        },
+      ),
+    );
+    const joinedSnapshot = await getPreviewRoundHandler(requestFor(round.id, visitor.token));
+
+    expect(invitation.jsonBody).toEqual({
+      invitationToken: round.invitationToken,
+      joinRequired: true,
     });
+    expect(snapshot.status).toBe(403);
+    expect(live.status).toBe(403);
+    expect(joined.status).toBe(200);
+    expect(joinedSnapshot.status).toBe(200);
+  });
 
-    it('anonymizes only the authenticated player and leaves shared scores intact', async () => {
-      const round = createPreviewRound('Aino', 18, 'scratch', '', 'guest:delete-aino');
-      const elli = joinPreviewRound(round.id, 'Elli', 18, 'guest:delete-elli')!.players[1]!;
-      readyRound(round.id);
-      previewRoundStore.score({
-        roundId: round.id,
-        playerId: round.players[0]!.id,
+  it('restricts lobby, invitation, and score mutations to joined participants and own scores', async () => {
+    const creator = await guest('Aino');
+    const participant = await guest('Elli');
+    const outsider = await guest('Veera');
+    const round = await createRound(creator);
+    await joinPreviewRoundHandler(
+      requestFor(
+        '',
+        participant.token,
+        { handicapIndex: 18, ratingTable: 'women' },
+        {
+          invitationToken: round.invitationToken,
+        },
+      ),
+    );
+    const stored = previewRoundStore.get(round.id)!;
+    const creatorPlayer = stored.players[0]!;
+    const participantPlayer = stored.players[1]!;
+
+    const lobby = await updatePreviewRoundPlayerHandler(
+      requestFor(
+        round.id,
+        participant.token,
+        {
+          name: 'Aino muuttui',
+          handicapIndex: 18,
+          teeLabel: '52',
+          ratingTable: 'men',
+          ready: true,
+        },
+        { playerId: creatorPlayer.id },
+      ),
+    );
+    const revoke = await revokePreviewInvitationHandler(requestFor(round.id, outsider.token));
+    const score = await recordPreviewScoreHandler(
+      requestFor(round.id, participant.token, {
+        playerId: creatorPlayer.id,
         holeNumber: 1,
         strokes: 4,
-      });
-      previewRoundStore.score({ roundId: round.id, playerId: elli.id, holeNumber: 1, strokes: 5 });
+        expectedRevision: 0,
+      }),
+    );
 
-      const deleted = await deleteAccountHandler(requestFor('', 'delete-aino'));
-      const snapshot = await getPreviewRoundHandler(requestFor(round.id, 'delete-elli'));
-      const deletedPlayerScore = await recordPreviewScoreHandler(
-        scoreRequestFor(round.id, round.players[0]!.id, 'delete-aino'),
-      );
-
-      expect(deleted.status).toBe(200);
-      expect(deleted.jsonBody).toEqual({ anonymizedRoundCount: 1 });
-      expect(snapshot.jsonBody).toMatchObject({
-        players: [
-          { identityId: undefined, name: 'Poistettu pelaaja' },
-          { identityId: 'guest:delete-elli', name: 'Elli' },
-        ],
-        scores: {
-          [round.players[0]!.id]: { 1: 4 },
-          [elli.id]: { 1: 5 },
-        },
-      });
-      expect(deletedPlayerScore.status).toBe(403);
-    });
+    expect(lobby.status).toBe(403);
+    expect(revoke.status).toBe(403);
+    expect(score.status).toBe(403);
+    expect(stored.players.find((player) => player.id === participantPlayer.id)?.ratingTable).toBe(
+      'women',
+    );
+    expect(stored.scores).toEqual({});
   });
 
-  describe('score authorization', () => {
-    it('limits invitation access to viewing and joining until the guest has joined', async () => {
-      const round = createPreviewRound('Aino', 18, 'scratch', '', 'guest:aino');
-      const viewerRequest = {
-        params: { invitationToken: round.invitationToken },
-        headers: new Headers({ 'x-preview-guest-id': 'viewer' }),
-      } as unknown as HttpRequest;
-      const joinRequest = {
-        ...viewerRequest,
-        json: async () => ({ name: 'Veera', handicapIndex: 18 }),
-      } as unknown as HttpRequest;
-
-      const invitedRound = await getPreviewInvitationHandler(viewerRequest);
-      const blockedSnapshot = await getPreviewRoundHandler(requestFor(round.id, 'viewer'));
-      const blockedScore = await recordPreviewScoreHandler(
-        scoreRequestFor(round.id, round.players[0]!.id, 'viewer'),
-      );
-      const blockedCompletion = await completePreviewRoundHandler(requestFor(round.id, 'viewer'));
-      const joinedRound = await joinPreviewRoundHandler(joinRequest);
-      const joinedPlayer = (
-        joinedRound.jsonBody as { players: Array<{ id: string; name: string }> }
-      ).players.find((player) => player.name === 'Veera')!;
-      const acceptedScore = await recordPreviewScoreHandler(
-        scoreRequestFor(round.id, joinedPlayer.id, 'viewer'),
-      );
-
-      expect(invitedRound.status).toBe(200);
-      expect(blockedSnapshot.status).toBe(403);
-      expect(blockedScore.status).toBe(403);
-      expect(blockedCompletion.status).toBe(403);
-      expect(joinedRound.status).toBe(200);
-      expect(acceptedScore.status).toBe(400);
-    });
-
-    it('rejects expired invitations for both viewing and joining', async () => {
-      const round = createPreviewRound('Aino', 18, 'scratch', '', 'guest:expired-aino');
-      round.invitationExpiresAt = new Date(Date.now() - 1_000).toISOString();
-      const invitationRequest = {
-        params: { invitationToken: round.invitationToken },
-        headers: new Headers({ 'x-preview-guest-id': 'expired-viewer' }),
-      } as unknown as HttpRequest;
-      const joinRequest = {
-        ...invitationRequest,
-        json: async () => ({ name: 'Veera', handicapIndex: 18 }),
-      } as unknown as HttpRequest;
-
-      const view = await getPreviewInvitationHandler(invitationRequest);
-      const join = await joinPreviewRoundHandler(joinRequest);
-
-      expect(view).toMatchObject({ status: 404 });
-      expect(join).toMatchObject({ status: 404 });
-      expect(round.players).toHaveLength(1);
-    });
-
-    it('lets only the creator revoke an invitation and blocks the old link afterwards', async () => {
-      const round = createPreviewRound('Aino', 18, 'scratch', '', 'guest:revoke-aino');
-      const creatorRequest = requestFor(round.id, 'revoke-aino');
-      const otherRequest = requestFor(round.id, 'revoke-elli');
-      const invitationRequest = {
-        params: { invitationToken: round.invitationToken },
-        headers: new Headers({ 'x-preview-guest-id': 'revoke-viewer' }),
-      } as unknown as HttpRequest;
-      const joinRequest = {
-        ...invitationRequest,
-        json: async () => ({ name: 'Veera', handicapIndex: 18 }),
-      } as unknown as HttpRequest;
-
-      const denied = await revokePreviewInvitationHandler(otherRequest);
-      const revoked = await revokePreviewInvitationHandler(creatorRequest);
-      const view = await getPreviewInvitationHandler(invitationRequest);
-      const join = await joinPreviewRoundHandler(joinRequest);
-
-      expect(denied).toMatchObject({ status: 403 });
-      expect(revoked).toMatchObject({
-        status: 200,
-        jsonBody: { invitationRevokedAt: expect.any(String) },
-      });
-      expect(view).toMatchObject({ status: 404 });
-      expect(join).toMatchObject({ status: 404 });
-      expect(round.players).toHaveLength(1);
-    });
-
-    it('prevents one participant from recording another participant’s score', async () => {
-      const round = createPreviewRound('Aino', 18, 'scratch', '', 'guest:aino');
-      const otherPlayer = joinPreviewRound(round.id, 'Elli', 18, 'guest:elli')!.players[1]!;
-      readyRound(round.id);
-
-      const denied = await recordPreviewScoreHandler(
-        scoreRequestFor(round.id, round.players[0]!.id, 'elli'),
-      );
-      const accepted = await recordPreviewScoreHandler(
-        scoreRequestFor(round.id, otherPlayer.id, 'elli'),
-      );
-
-      expect(denied.status).toBe(403);
-      expect(round.scores[round.players[0]!.id]).toBeUndefined();
-      expect(accepted.status).toBe(200);
-      expect(round.scores[otherPlayer.id]?.[1]).toBe(4);
-    });
-
-    it('returns the authoritative score snapshot when a correction revision is stale', async () => {
-      const round = createPreviewRound('Aino', 18, 'scratch', '', 'guest:revision-aino');
-      const elli = joinPreviewRound(round.id, 'Elli', 18, 'guest:revision-elli')!.players[1]!;
-      readyRound(round.id);
-
-      const initial = await recordPreviewScoreHandler(
-        scoreRequestFor(round.id, round.players[0]!.id, 'revision-aino', 0),
-      );
-      const staleCorrection = await recordPreviewScoreHandler(
-        scoreRequestFor(round.id, round.players[0]!.id, 'revision-aino', 0),
-      );
-
-      expect(initial.status).toBe(200);
-      expect(staleCorrection.status).toBe(409);
-      expect(staleCorrection.jsonBody).toMatchObject({
-        currentRevision: 1,
-        round: {
-          scores: { [round.players[0]!.id]: { 1: 4 } },
-          scoreRevisions: { [round.players[0]!.id]: { 1: 1 } },
+  it('limits completed history to joined guests and clears or anonymizes only the current guest', async () => {
+    const aino = await guest('Aino');
+    const elli = await guest('Elli');
+    const sanni = await guest('Sanni');
+    const outsider = await guest('Veera');
+    const round = await createRound(aino);
+    await joinPreviewRoundHandler(
+      requestFor(
+        '',
+        elli.token,
+        { handicapIndex: 18, ratingTable: 'women' },
+        {
+          invitationToken: round.invitationToken,
         },
-      });
-      expect(round.scores[elli.id]).toBeUndefined();
+      ),
+    );
+    await joinPreviewRoundHandler(
+      requestFor(
+        '',
+        sanni.token,
+        { handicapIndex: 18, ratingTable: 'women' },
+        {
+          invitationToken: round.invitationToken,
+        },
+      ),
+    );
+    const active = previewRoundStore.get(round.id)!;
+    const ainoPlayer = active.players[0]!;
+    previewRoundStore.updatePlayer({
+      roundId: round.id,
+      playerId: ainoPlayer.id,
+      identityId: aino.subject,
+      name: 'Aino',
+      handicapIndex: 18,
+      teeLabel: '52',
+      ratingTable: 'men',
+      ready: true,
     });
-
-    describe('live round connections', () => {
-      it('allows local update polling only for a joined participant', async () => {
-        const round = createPreviewRound('Aino', 18, 'scratch', '', 'guest:aino');
-
-        const participant = await getRoundLiveConnectionHandler(requestFor(round.id, 'aino'));
-        const viewer = await getRoundLiveConnectionHandler(requestFor(round.id, 'viewer'));
-
-        expect(participant.jsonBody).toEqual({ kind: 'poll', pollIntervalMilliseconds: 1000 });
-        expect(viewer.status).toBe(403);
-      });
-
-      it('gives a reconnecting participant the authoritative persisted score snapshot', async () => {
-        const round = createPreviewRound('Aino', 18, 'scratch', '', 'guest:reconnect-aino');
-        const elli = joinPreviewRound(round.id, 'Elli', 18, 'guest:reconnect-elli')!.players[1]!;
-        readyRound(round.id);
-
-        await recordPreviewScoreHandler(
-          scoreRequestFor(round.id, round.players[0]!.id, 'reconnect-aino'),
-        );
-        const reconnectedSnapshot = await getPreviewRoundHandler(
-          requestFor(round.id, 'reconnect-elli'),
-        );
-
-        expect(reconnectedSnapshot.status).toBe(200);
-        expect(reconnectedSnapshot.jsonBody).toMatchObject({
-          scores: { [round.players[0]!.id]: { 1: 4 } },
-          players: expect.arrayContaining([expect.objectContaining({ id: elli.id })]),
-        });
-      });
+    const elliPlayer = active.players[1]!;
+    previewRoundStore.updatePlayer({
+      roundId: round.id,
+      playerId: elliPlayer.id,
+      identityId: elli.subject,
+      name: 'Elli',
+      handicapIndex: 18,
+      teeLabel: '52',
+      ratingTable: 'women',
+      ready: true,
     });
+    const sanniPlayer = active.players[2]!;
+    previewRoundStore.updatePlayer({
+      roundId: round.id,
+      playerId: sanniPlayer.id,
+      identityId: sanni.subject,
+      name: 'Sanni',
+      handicapIndex: 18,
+      teeLabel: '52',
+      ratingTable: 'women',
+      ready: true,
+    });
+    previewRoundStore.start(round.id);
+    previewRoundStore.score({
+      roundId: round.id,
+      playerId: ainoPlayer.id,
+      holeNumber: 1,
+      strokes: 4,
+    });
+    previewRoundStore.finish(round.id);
 
-    describe('round lobby API', () => {
-      it('allows only a participant to confirm their own settings and only the creator to start', async () => {
-        const round = createPreviewRound('Aino', 18, 'scratch', '', 'guest:aino');
-        const elli = joinPreviewRound(round.id, 'Elli', 18, 'guest:elli')!.players[1]!;
-        const aino = round.players[0]!;
+    expect(
+      (await listCompletedPreviewRoundsHandler(requestFor('', outsider.token))).jsonBody,
+    ).toEqual([]);
+    expect(
+      (await getCompletedPreviewRoundHandler(requestFor(round.id, outsider.token))).status,
+    ).toBe(403);
+    expect((await getCompletedPreviewRoundHandler(requestFor(round.id, elli.token))).status).toBe(
+      200,
+    );
+    expect((await clearGuestSessionHandler(requestFor('', elli.token))).jsonBody).toEqual({
+      cleared: true,
+    });
+    expect((await getCompletedPreviewRoundHandler(requestFor(round.id, elli.token))).status).toBe(
+      401,
+    );
 
-        const crossPlayerUpdate = await updatePreviewRoundPlayerHandler(
-          playerSettingsRequest(round.id, aino.id, 'elli', {
-            name: 'Aino muuttui',
-            handicapIndex: 18,
-            teeLabel: '52',
-            ratingTable: 'men',
-            ready: true,
-          }),
-        );
-        const incompleteStart = await startPreviewRoundHandler(startRequestFor(round.id, 'aino'));
-        const participantStart = await startPreviewRoundHandler(startRequestFor(round.id, 'elli'));
-        const ainoReady = await updatePreviewRoundPlayerHandler(
-          playerSettingsRequest(round.id, aino.id, 'aino', {
-            name: 'Aino',
-            handicapIndex: 18,
-            teeLabel: '52',
-            ratingTable: 'men',
-            ready: true,
-          }),
-        );
-        const elliReady = await updatePreviewRoundPlayerHandler(
-          playerSettingsRequest(round.id, elli.id, 'elli', {
-            name: 'Elli',
-            handicapIndex: 18,
-            teeLabel: '56',
-            ratingTable: 'women',
-            ready: true,
-          }),
-        );
-        const started = await startPreviewRoundHandler(startRequestFor(round.id, 'aino'));
-
-        expect(crossPlayerUpdate.status).toBe(403);
-        expect(incompleteStart.status).toBe(400);
-        expect(participantStart.status).toBe(403);
-        expect(ainoReady.status).toBe(200);
-        expect(elliReady.jsonBody).toMatchObject({
-          players: expect.arrayContaining([expect.objectContaining({ name: 'Aino', ready: true })]),
-        });
-        expect(started.jsonBody).toMatchObject({
-          state: 'active',
-          players: expect.arrayContaining([
-            expect.objectContaining({
-              name: 'Elli',
-              teeLabel: '56',
-              ratingTable: 'women',
-              ready: true,
-            }),
-          ]),
-        });
-      });
-
-      it('rejects scores before a creator starts the ready lobby', async () => {
-        const round = createPreviewRound('Aino', 18, 'scratch', '', 'guest:aino');
-        const elli = joinPreviewRound(round.id, 'Elli', 18, 'guest:elli')!.players[1]!;
-
-        const score = await recordPreviewScoreHandler(scoreRequestFor(round.id, elli.id, 'elli'));
-
-        expect(score.status).toBe(400);
-        expect(round.scores).toEqual({});
-      });
-
-      it('rejects a fifth authenticated guest after four players have joined by invitation', async () => {
-        const round = createPreviewRound('Aino', 18, 'scratch', '', 'guest:limit-aino');
-        const join = (guestId: string, name: string): HttpRequest =>
-          ({
-            params: { invitationToken: round.invitationToken },
-            headers: new Headers({ 'x-preview-guest-id': guestId }),
-            json: async () => ({ name, handicapIndex: 18 }),
-          }) as unknown as HttpRequest;
-
-        await expect(joinPreviewRoundHandler(join('limit-elli', 'Elli'))).resolves.toMatchObject({
-          status: 200,
-        });
-        await expect(joinPreviewRoundHandler(join('limit-sanni', 'Sanni'))).resolves.toMatchObject({
-          status: 200,
-        });
-        await expect(joinPreviewRoundHandler(join('limit-pekka', 'Pekka'))).resolves.toMatchObject({
-          status: 200,
-        });
-        const rejected = await joinPreviewRoundHandler(join('limit-veera', 'Veera'));
-
-        expect(round.players).toHaveLength(4);
-        expect(rejected).toMatchObject({
-          status: 409,
-          jsonBody: {
-            error: 'Kierros on täynnä. Voit silti katsella kierrosta kutsulinkillä.',
-          },
-        });
-      });
+    const deleted = await deleteGuestDataHandler(requestFor('', aino.token));
+    const visibleToSanni = await getCompletedPreviewRoundHandler(requestFor(round.id, sanni.token));
+    expect(deleted.jsonBody).toEqual({ anonymizedRoundCount: 1 });
+    expect(visibleToSanni.status).toBe(200);
+    expect(previewRoundStore.getHistory(round.id)?.players[0]).toMatchObject({
+      identityId: undefined,
+      name: 'Poistettu pelaaja',
     });
   });
 });
