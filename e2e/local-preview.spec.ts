@@ -29,8 +29,13 @@ test('two iPhone-sized participants join locally, settle a side-game tie, correc
   try {
     await creator.goto('/');
     await creator.locator('#player-name').fill('Aino');
+    await creator.getByRole('button', { name: 'Lisää peli' }).click();
+    await creator.getByRole('combobox', { name: 'Pelimuoto' }).nth(1).selectOption('handicap');
+    await creator.getByRole('textbox', { name: 'Palkinto (valinnainen)' }).nth(1).fill('Lounas');
     await creator.getByRole('button', { name: 'Luo kierros' }).click();
     await expect(creator.getByRole('heading', { name: 'Kierroksen aula' })).toBeVisible();
+    await expect(creator.getByRole('heading', { name: 'Pelien valmius' })).toBeVisible();
+    await expect(creator.getByText('Peli 2 · Tasoituksellinen reikäpeli')).toBeVisible();
 
     await creator.getByRole('button', { name: 'Kopioi liittymislinkki' }).click();
     await expect(creator.getByRole('button', { name: 'Liittymislinkki kopioitu' })).toBeVisible();
@@ -57,12 +62,12 @@ test('two iPhone-sized participants join locally, settle a side-game tie, correc
 
     await creator.locator('#strokes').fill('4');
     await creator.getByRole('button', { name: 'Tallenna tulos' }).click();
-    await expect(creator.getByText('0 reikää', { exact: true })).toBeVisible();
+    await expect(creator.getByText(/0 reikää/).first()).toBeVisible();
 
     await joiner.locator('#strokes').fill('4');
     await joiner.getByRole('button', { name: 'Tallenna tulos' }).click();
 
-    await expect(creator.getByText('1 reikää', { exact: true })).toBeVisible();
+    await expect(creator.getByText(/1 reikää/).first()).toBeVisible();
     await expect(creator.getByText('Reikä 1: tasatulos').first()).toBeVisible();
     await expect(creator.getByText('Tasapeli').last()).toBeVisible();
 
@@ -79,6 +84,8 @@ test('two iPhone-sized participants join locally, settle a side-game tie, correc
     await expect(creator.getByRole('heading', { name: 'Kierroksen historia' })).toBeVisible();
     await expect(creator.getByText('Kierros päättyi')).toBeVisible();
     await expect(creator.getByText('Palkinto: Kahvit')).toBeVisible();
+    await expect(creator.getByText('Peli 2').first()).toBeVisible();
+    await expect(creator.getByText('Palkinto: Lounas')).toBeVisible();
     await expect(creator.getByText('Reikä 1: 3 lyöntiä')).toBeVisible();
   } finally {
     await creatorContext.close();
