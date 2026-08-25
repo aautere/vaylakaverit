@@ -31,9 +31,9 @@ holes 1 through 9. The backend remains authoritative for course-data validation 
 ### Course registry and immutable round snapshot
 
 Define a common course-configuration shape in the domain package. It contains a stable course ID,
-display name, source URL, source/effective dates, a version identifier, tees, rating tables, and
-one or more supported layouts. A layout defines its available round length and an ordered list of
-round-hole definitions.
+display name, source URL, source/effective dates, a version identifier, tees, the rating tables it
+supports, and one or more supported layouts. A layout defines its available round length and an
+ordered list of round-hole definitions.
 
 At creation, the API validates the requested course and layout, then records an immutable course
 snapshot or version reference with the round. API responses expose the course name, layout length,
@@ -65,6 +65,17 @@ This preserves the existing policy for handicap match play. Scratch play is not 
 publish a partly configured course, because all players must be able to select valid tees and a
 round must remain coherent in history.
 
+### Rock Golf rating-table scope
+
+Rock Golf's first configuration exposes only the men's rating table. The client presents it as the
+fixed available table and the API rejects a women's-table payload for Rock Golf. Golf Talma Master
+continues to expose both its verified tables. The course registry represents supported tables
+explicitly so a later verified Rock Golf women's table can be added as a new version without
+changing historical rounds.
+
+This is preferred to presenting an unavailable option or reusing men's values for women, either of
+which would imply an unsupported handicap calculation.
+
 ### Generic API and UI contracts
 
 Round creation accepts a course ID and layout length rather than selecting an implicit Talma course.
@@ -81,6 +92,8 @@ from old clients and invitation holders.
 - [Rock Golf official data is incomplete or its 9/18-hole handicap treatment is unclear] → Do not
   enable the course; obtain written club clarification or official published tables and record the
   applicable configuration.
+- [Rock Golf women's rating data is unavailable] → Expose only the verified men's table and reject
+  the unavailable selection until a later version is verified.
 - [Existing serialized rounds lack a course ID and layout] → Read legacy persisted and preview
   Talma rounds as the versioned 18-hole Talma configuration, then write explicit values for all new
   rounds. Add compatibility tests before deployment.
@@ -111,7 +124,8 @@ from old clients and invitation holders.
   The 9-hole layout normalizes the first-pass odd indexes to the 1–9 scale: `(first-pass index +
   1) / 2`. Its sequence is 3, 6, 4, 8, 9, 1, 7, 2, and 5. For each physical hole, the 18-hole
   second pass uses the first-pass index plus one, producing the even indexes. Rock Golf must still
-  publish or confirm rating/slope tables, playing-handicap lookup data, and their effective date
-  before enabling the configuration.
+  publish or confirm the men's rating/slope tables, playing-handicap lookup data, and their
+  effective date before enabling the initial configuration. Women's values are intentionally
+  outside that initial configuration.
 - Confirm whether the official source designates a preferred default tee for Rock Golf; otherwise
   the product owner must choose one explicitly before implementation.

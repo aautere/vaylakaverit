@@ -23,6 +23,8 @@ explains repetition without technical course-data language.
 | Rock 9-hole choice | `9 reikää` | Play one round of Rock Golf's layout. | Option label. |
 | Rock 18-hole choice/help | `18 reikää (2 × 9 reikää)` / `Pelaat Rock Golfin yhdeksän reikää kahdesti.` | Confirm the desired length. | Visible help, not tooltip-only. |
 | Selected summary | `{course} · {holes} reikää` | Continue to tee selection. | For Rock 18, use `Rock Golf · 18 reikää (2 × 9)`. |
+| Rock rating-table information | `Pelitasoitustaulukko: miehet` / `Rock Golfilla käytetään tällä hetkellä miesten pelitasoitustaulukkoa.` | Continue to player setup. | Labelled information row; do not hide the applied table. |
+| Unavailable Rock rating table | `Rock Golfilla ei voi tällä hetkellä käyttää naisten pelitasoitustaulukkoa. Käytössä on miesten pelitasoitustaulukko.` | Continue with the available table. | Assertive text only after a stale or invalid women's selection. |
 | Loading | `Kenttiä ladataan…` | Wait. | Polite status. |
 | Course unavailable | `Kenttäasetuksia ei voitu ladata. Yritä uudelleen.` | `Yritä uudelleen` | Assertive status near selector. |
 | Stale selection | `Kentän asetukset päivittyivät. Valitse kenttä ja kierroksen pituus uudelleen.` | Reselect deliberately. | Return focus to course group. |

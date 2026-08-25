@@ -21,7 +21,9 @@ Add a course selector to shared-round creation with Golf Talma Master first and 
   pass is represented as round holes 10 through 18 so that score entry, live standings, game
   ranges, history, and corrections work consistently with an 18-hole round.
 - Each course configuration defines its available round lengths, tee labels, default tee, hole
-  order, and official playing-handicap data.
+  order, supported rating tables, and official playing-handicap data.
+- Rock Golf initially supports only the men's rating table. The women's table remains unavailable
+  until its official values have been verified.
 - Rock Golf course, tee, and handicap data is imported only after its official source and effective
   date have been recorded.
 

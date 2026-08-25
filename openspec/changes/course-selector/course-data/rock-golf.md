@@ -17,11 +17,11 @@
 
 | Layout | Holes | Total par | Tee | Total metres | Men CR / slope | Women CR / slope | Source |
 | --- | ---: | ---: | --- | ---: | --- | --- | --- |
-| 9 holes | 9 | 27 | R | 1474 | Missing | Missing | Rockin väylien pituudet |
-| 9 holes | 9 | 27 | O | 1314 | Missing | Missing | Rockin väylien pituudet |
-| 9 holes | 9 | 27 | C | 1159 | Missing | Missing | Rockin väylien pituudet |
-| 9 holes | 9 | 27 | K | 934 | Missing | Missing | Rockin väylien pituudet |
-| 18 holes | 18 | 54 | R, O, C, K | Two 9-hole passes | Missing | Missing | Rock Golf Q&A |
+| 9 holes | 9 | 27 | R | 1474 | Missing | Not supported initially | Rockin väylien pituudet |
+| 9 holes | 9 | 27 | O | 1314 | Missing | Not supported initially | Rockin väylien pituudet |
+| 9 holes | 9 | 27 | C | 1159 | Missing | Not supported initially | Rockin väylien pituudet |
+| 9 holes | 9 | 27 | K | 934 | Missing | Not supported initially | Rockin väylien pituudet |
+| 18 holes | 18 | 54 | R, O, C, K | Two 9-hole passes | Missing | Not supported initially | Rock Golf Q&A |
 
 ## Hole data
 
@@ -62,8 +62,9 @@ first-pass index plus one: 5/6, 11/12, 7/8, 15/16, 17/18, 1/2, 13/14, 3/4, and 9
 
 ## Playing-handicap data
 
-No official playing-handicap lookup table or written calculation policy has been retrieved. Course
-Rating and Slope Rating values are also missing for both rating tables and both offered lengths.
+No official men's playing-handicap lookup table or written calculation policy has been retrieved.
+Men's Course Rating and Slope Rating values are also missing for both offered lengths. The women's
+table is intentionally not supported in Rock Golf's initial product configuration.
 
 ## Data checks
 
@@ -79,5 +80,6 @@ Rating and Slope Rating values are also missing for both rating tables and both 
 ## Blockers and handoff
 
 Rock Golf cannot yet be configured or shown in the course selector. Rock Golf or Suomen Golfliitto
-must provide the men's and women's Course Rating and Slope Rating tables for both lengths, the
-playing-handicap policy or lookup values, and their effective date.
+must provide the men's Course Rating and Slope Rating tables for both lengths, the men's
+playing-handicap policy or lookup values, and their effective date. Women's values are not required
+for the initial Rock Golf configuration.

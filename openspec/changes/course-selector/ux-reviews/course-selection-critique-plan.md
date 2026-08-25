@@ -12,6 +12,7 @@
 | Area | Evidence to capture before readiness |
 | --- | --- |
 | Course and length selection | Create a Talma 18-hole round, a Rock 9-hole round, and a Rock 18-hole round; confirm only valid lengths appear and the chosen summary persists into the lobby. |
+| Rating-table availability | Select Rock Golf after a women's-table choice; verify that the table changes to the labelled men's-only state, the server rejects a forged women's payload, and Talma still offers both configured tables. |
 | Repeated layout | Enter and correct scores on Rock round holes 3 and 12; verify that they remain distinct and that the latter identifies the second pass of source hole 3. |
 | Boundaries and games | Attempt score, side-game, and extension actions outside a 9-hole round; verify the visible recovery and absence of hole 10 data. |
 | Data/version safety | Exercise unavailable and stale configurations in preview; verify selection errors, deliberate reselection, and stable historical rendering for a prior version. |

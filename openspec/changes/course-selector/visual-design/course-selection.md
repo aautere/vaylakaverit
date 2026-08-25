@@ -17,6 +17,11 @@ Do not present a visual course card gallery, a map, or a search field for this t
 The selected indicator, course name, and round-length text are sufficient and remain clear in
 bright outdoor conditions.
 
+For Rock Golf, render the men's rating table as a compact labelled information row below the tee
+selection. It is not an unavailable-looking select or an omitted setting: the row plainly explains
+that this is the only available calculation table. Golf Talma Master retains its interactive,
+configured rating-table control.
+
 ## iPhone-first layout and responsive behaviour
 
 Use one full-width column on iPhone. Each entire course or length row is the tappable target. The
@@ -34,6 +39,7 @@ more visual emphasis than the repeated source-hole label.
 | --- | --- | --- | --- |
 | Course and length groups | Native radio groups and labelled full-width rows | `surface-raised`, `border-strong`, `focus-ring`, selected action/border treatment | None |
 | Selected course summary | `Card` or compact summary row | `surface-subtle`, `text-strong`, `text-muted` | None |
+| Rock Golf rating table | Labelled read-only information row | `surface-subtle`, `text-strong`, `text-muted` | None |
 | Loading, unavailable, stale, offline states | `StatusMessage` | Existing info, warning, and danger status tokens | None |
 | Create action | `Action` | Existing primary and disabled action tokens | None |
 | Second-pass score context | Existing score row/card text | `text-strong` for round hole, `text-muted` for pass/source-hole context | None |
@@ -46,6 +52,10 @@ unavailable control state; it is never represented only by a muted colour. An in
 places the status next to the course/length group. Offline pre-creation prevents submission and
 keeps selected values readable. There is no empty course list in ordinary release operation, but if
 it occurs the create card names the problem and leaves join/history visible.
+
+When a stale women's-table selection is cleared for Rock Golf, keep the field location stable,
+show the men's rating-table row, and give a short text status. Do not show a disabled women's
+option without its explanation.
 
 ## Accessibility
 

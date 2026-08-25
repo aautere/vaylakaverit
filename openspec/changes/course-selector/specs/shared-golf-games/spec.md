@@ -12,9 +12,10 @@ numbers, colours, or both. A course configuration SHALL define the initial defau
 Master SHALL use tee 52 as its initial default tee.
 
 The system MUST make a course available for selection only when its current, official scorecard,
-tee, and playing-handicap data have been recorded in a versioned course configuration. The system
-SHALL retain the selected course configuration with each round so a later update cannot alter a
-completed round.
+tee, and playing-handicap data have been recorded in a versioned course configuration for each
+rating table it supports. Rock Golf SHALL initially support only the men's rating table. The backend
+MUST reject an unavailable rating-table selection. The system SHALL retain the selected course
+configuration with each round so a later update cannot alter a completed round.
 
 The system SHALL allow anyone holding a round's invitation link or QR code to view that round and
 its history without permission to alter player scores.
@@ -40,6 +41,13 @@ its history without permission to alter player scores.
 - **THEN** the system creates 18 ordered round holes from two consecutive passes of Rock Golf's
   configured nine-hole layout
 - **AND** it identifies the second pass as round holes 10 through 18
+
+#### Scenario: Rock Golf uses its available rating table
+
+- **GIVEN** a player selects Rock Golf while creating or configuring a round
+- **WHEN** they view the rating-table setting
+- **THEN** the system uses the men's rating table
+- **AND** it does not offer the women's rating table for Rock Golf
 
 #### Scenario: Players join a new round
 
