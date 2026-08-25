@@ -10,7 +10,7 @@ import { IdentityService } from './auth/identity.js';
 import { readLiveUpdateConfig } from './live-updates/config.js';
 import { createRoundUpdateTransport } from './live-updates/round-update-transport.js';
 import { createRoundStore } from './store/create-round-store.js';
-import { ScoreRevisionConflictError } from './store/round-store.js';
+import { ScoreRevisionConflictError, type FullRoundGameInput } from './store/round-store.js';
 
 const roundStore = createRoundStore();
 readAuthConfig();
@@ -53,6 +53,44 @@ async function requestBody(request: HttpRequest): Promise<Record<string, unknown
   const body: unknown = await request.json().catch(() => ({}));
 
   return typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : {};
+}
+
+function parseFullRoundGames(value: unknown): FullRoundGameInput[] | undefined | null {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value) || value.length === 0) {
+    return null;
+  }
+
+  const games: FullRoundGameInput[] = [];
+  for (const valueItem of value) {
+    if (typeof valueItem !== 'object' || valueItem === null) {
+      return null;
+    }
+    const game = valueItem as Record<string, unknown>;
+    if (
+      (game.mode !== 'scratch' && game.mode !== 'handicap') ||
+      typeof game.reward !== 'string' ||
+      (game.holeTieRule !== undefined &&
+        game.holeTieRule !== 'no-winner' &&
+        game.holeTieRule !== 'carry-forward') ||
+      (game.endTieRule !== undefined &&
+        game.endTieRule !== 'draw' &&
+        game.endTieRule !== 'continue') ||
+      game.carryEligiblePlayerIds !== undefined
+    ) {
+      return null;
+    }
+
+    games.push({
+      mode: game.mode,
+      reward: game.reward.trim(),
+      holeTieRule: game.holeTieRule,
+      endTieRule: game.endTieRule,
+    });
+  }
+  return games;
 }
 
 app.http('apiOptions', {
@@ -117,6 +155,11 @@ export async function createPreviewRoundHandler(request: HttpRequest): Promise<H
   const reward = typeof body.reward === 'string' ? body.reward : '';
   const holeTieRule = body.holeTieRule === 'carry-forward' ? 'carry-forward' : 'no-winner';
   const endTieRule = body.endTieRule === 'continue' ? 'continue' : 'draw';
+  const games = parseFullRoundGames(body.games);
+
+  if (games === null) {
+    return json({ error: 'Tarkista pelin asetukset.' }, 400);
+  }
 
   try {
     return json(
@@ -130,6 +173,7 @@ export async function createPreviewRoundHandler(request: HttpRequest): Promise<H
         reward: reward.trim(),
         holeTieRule,
         endTieRule,
+        games,
       }),
       201,
     );

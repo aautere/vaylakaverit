@@ -1,15 +1,18 @@
-import type { ButtonHTMLAttributes } from 'react';
+import { forwardRef, type ButtonHTMLAttributes } from 'react';
 
 type ActionProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   tone?: 'primary' | 'secondary';
 };
 
-export function Action({ className, tone = 'primary', type = 'button', ...props }: ActionProps) {
-  return (
+export const Action = forwardRef<HTMLButtonElement, ActionProps>(
+  ({ className, tone = 'primary', type = 'button', ...props }, ref) => (
     <button
       {...props}
+      ref={ref}
       className={['ui-action', `ui-action--${tone}`, className].filter(Boolean).join(' ')}
       type={type}
     />
-  );
-}
+  ),
+);
+
+Action.displayName = 'Action';

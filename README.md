@@ -24,13 +24,13 @@ pnpm preview
 
 ## Useful commands
 
-| Command                       | Purpose                                        |
-| ----------------------------- | ---------------------------------------------- |
-| `pnpm spec:new <change-name>` | Create an OpenSpec change with a proposal      |
-| `pnpm spec:validate`          | Validate committed specs and in-flight changes |
-| `pnpm harness:test`           | Test the OpenSpec change wrapper               |
-| `pnpm format`                 | Format tracked project files                   |
-| `pnpm check`                  | Run all currently applicable quality gates     |
+| Command                       | Purpose                                            |
+| ----------------------------- | -------------------------------------------------- |
+| `pnpm spec:new <change-name>` | Create an OpenSpec change with a proposal          |
+| `pnpm spec:validate`          | Validate committed specs and in-flight changes     |
+| `pnpm harness:test`           | Test the OpenSpec change wrapper and Azure scripts |
+| `pnpm format`                 | Format tracked project files                       |
+| `pnpm check`                  | Run all currently applicable quality gates         |
 
 See `AGENTS.md` for the working rules and `openspec/config.yaml` for the specification workflow.
 
@@ -96,6 +96,10 @@ guest-session expiry and clear/delete recovery, Azure managed-identity permissio
 Web PubSub, deployed PWA installation and updates on physical iPhone Safari, Azure monitoring and
 alerts, and GitHub branch protections/required checks. Never place credentials or production data in
 this repository.
+
+A deployment workflow reporting success does not prove an environment works. After deploying,
+run `./scripts/azure-verify-deployment.sh <environment>` to check the deployed environment against
+Azure. See `infra/README.md` for the deployment order and what the verification covers.
 
 ## License
 

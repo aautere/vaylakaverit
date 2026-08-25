@@ -1,0 +1,63 @@
+name: Deploy API
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Azure environment to deploy
+        required: true
+        type: choice
+        options:
+          - development
+          - production
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: |
+          pnpm --filter @vaylakaverit/domain build
+          pnpm --filter @vaylakaverit/api build
+          # Flex Consumption mounts the package read-only and does not resolve the
+          # symlinked pnpm store, so the package needs a hoisted node_modules tree.
+          pnpm --filter @vaylakaverit/api deploy --prod --config.node-linker=hoisted api-package
+          rm -f api-package/local.settings.json
+          if [ -n "$(find api-package -type l -not -path 'api-package/node_modules/.bin/*')" ]; then
+            echo 'Deployment package contains symlinks outside node_modules/.bin.' >&2
+            find api-package -type l -not -path 'api-package/node_modules/.bin/*' >&2
+            exit 1
+          fi
+          (
+            cd api-package
+            zip --quiet --recurse-paths ../api-package.zip .
+          )
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - id: infrastructure
+        run: |
+          function_app_name="$(az deployment sub show \
+            --name vaylakaverit-${{ inputs.environment }} \
+            --query properties.outputs.functionAppName.value \
+            --output tsv)"
+          echo "function_app_name=$function_app_name" >> "$GITHUB_OUTPUT"
+      - uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ steps.infrastructure.outputs.function_app_name }}
+          package: api-package.zip
