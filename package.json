@@ -1,18 +1,24 @@
 {
-  "name": "golf",
+  "name": "vaylakaverit",
   "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@9.12.0",
   "engines": {
-    "node": ">=20.11.0"
+    "node": ">=22.0.0"
   },
   "scripts": {
+    "dev": "pnpm --filter @vaylakaverit/web dev",
+    "dev:api": "pnpm --filter @vaylakaverit/api dev",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
     "spec:new": "./scripts/openspec-new-change.sh",
     "spec:validate": "openspec validate --all --strict --no-interactive",
     "harness:test": "bash scripts/__tests__/run-all.sh",
-    "check": "pnpm format:check && pnpm harness:test && pnpm spec:validate",
+    "check": "pnpm format:check && pnpm harness:test && pnpm spec:validate && pnpm typecheck && pnpm test",
     "prepare": "husky"
   },
   "devDependencies": {
