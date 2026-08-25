@@ -1,6 +1,7 @@
 # Azure infrastructure
 
-`main.bicep` creates one resource group per environment and defines:
+`main.bicep` deploys environments into the shared CAF-named resource group `rg-vaylakaverit` and
+defines:
 
 - Azure Static Web Apps for the PWA;
 - Azure Functions Flex Consumption for the API;

@@ -12,7 +12,7 @@ param location string = 'westeurope'
 @description('A short resource-name prefix. Use lowercase letters and numbers only.')
 param namePrefix string = 'vaylakaverit'
 
-var resourceGroupName = '${namePrefix}-${environmentName}-rg'
+var resourceGroupName = 'rg-${namePrefix}'
 
 resource resourceGroup 'Microsoft.Resources/resourceGroups@2024-11-01' = {
   name: resourceGroupName

@@ -92,8 +92,8 @@ minimal deployment and runtime secrets.
 
 GitHub Actions deploys approved changes to Azure using OpenID Connect federation and least-privilege
 Azure roles. No long-lived Azure credentials are stored in GitHub. Development and production use
-separate Azure resource groups and application configuration. Production deployment requires an
-explicit approval step.
+separate application resources and configuration in the shared CAF-named `rg-vaylakaverit`
+resource group. Production deployment requires an explicit approval step.
 
 The GitHub deployment identity has Contributor access only. The Bicep deployment deliberately does
 not create Azure RBAC role assignments. After provisioning, an Azure RBAC administrator runs the

@@ -30,8 +30,9 @@
       configuration model.
 - [ ] 2.4 Create a public MIT-licensed GitHub repository under the `aautere` personal profile;
       configure protected pull requests, secret scanning, GitHub Actions quality checks, Bicep
-      validation, OpenID Connect Azure federation, separate development and production resource
-      groups, and explicit production-deployment approval.
+      validation, OpenID Connect Azure federation, separate development and production application
+      resources in the shared `rg-vaylakaverit` resource group, and explicit production-deployment
+      approval.
 - [ ] 2.5 Implement Apple sign-in and a device-bound guest session with a display name; ensure
       guest access is restricted to the joined round and their own score mutations.
 - [ ] 2.6 Add the verified Golf Talma Master course configuration and validate its hole and tee
