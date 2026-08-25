@@ -32,11 +32,18 @@ jobs:
       - run: |
           pnpm --filter @vaylakaverit/domain build
           pnpm --filter @vaylakaverit/api build
-          pnpm --filter @vaylakaverit/api deploy --prod api-package
+          # Flex Consumption mounts the package read-only and does not resolve the
+          # symlinked pnpm store, so the package needs a hoisted node_modules tree.
+          pnpm --filter @vaylakaverit/api deploy --prod --config.node-linker=hoisted api-package
           rm -f api-package/local.settings.json
+          if [ -n "$(find api-package -type l -not -path 'api-package/node_modules/.bin/*')" ]; then
+            echo 'Deployment package contains symlinks outside node_modules/.bin.' >&2
+            find api-package -type l -not -path 'api-package/node_modules/.bin/*' >&2
+            exit 1
+          fi
           (
             cd api-package
-            zip --quiet --symlinks --recurse-paths ../api-package.zip .
+            zip --quiet --recurse-paths ../api-package.zip .
           )
       - uses: azure/login@v2
         with:

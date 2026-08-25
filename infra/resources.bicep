@@ -125,6 +125,63 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
   }
 }
 
+var storageBlobDataOwnerRoleId = 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
+var storageQueueDataContributorRoleId = '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
+var storageTableDataContributorRoleId = '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
+var monitoringMetricsPublisherRoleId = '3913510d-42f4-4e42-8a64-420c390055eb'
+
+resource functionAppStorageBlobRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: storageAccount
+  name: guid(storageAccount.id, functionApp.id, storageBlobDataOwnerRoleId)
+  properties: {
+    principalId: functionApp.identity.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      storageBlobDataOwnerRoleId
+    )
+  }
+}
+
+resource functionAppStorageQueueRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: storageAccount
+  name: guid(storageAccount.id, functionApp.id, storageQueueDataContributorRoleId)
+  properties: {
+    principalId: functionApp.identity.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      storageQueueDataContributorRoleId
+    )
+  }
+}
+
+resource functionAppStorageTableRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: storageAccount
+  name: guid(storageAccount.id, functionApp.id, storageTableDataContributorRoleId)
+  properties: {
+    principalId: functionApp.identity.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      storageTableDataContributorRoleId
+    )
+  }
+}
+
+resource functionAppMetricsPublisherRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: applicationInsights
+  name: guid(applicationInsights.id, functionApp.id, monitoringMetricsPublisherRoleId)
+  properties: {
+    principalId: functionApp.identity.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      monitoringMetricsPublisherRoleId
+    )
+  }
+}
+
 resource functionAppSettings 'Microsoft.Web/sites/config@2024-04-01' = {
   parent: functionApp
   name: 'appsettings'
