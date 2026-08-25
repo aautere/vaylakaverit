@@ -103,7 +103,7 @@ The import must reject incomplete, duplicate, or non-18-hole data. The course co
 versioned with an effective date so a later club change does not silently rewrite completed-round
 history. The application displays each imported tee label exactly as supplied by the course; a
 separate product configuration selects the initial default tee and must not infer it from a colour
-or number.
+or number. Golf Talma Master uses tee 52 as its first-release default.
 
 ## Handicap and match-play rule decision
 

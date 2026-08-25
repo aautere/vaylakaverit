@@ -9,6 +9,8 @@ course, and invite other players by displaying a QR code.
 The system SHALL display a course's tee labels exactly as configured, whether the labels are
 numbers, colours, or both. A course configuration SHALL define the initial default tee.
 
+Golf Talma Master SHALL use tee 52 as its initial default tee.
+
 The system SHALL allow anyone holding a round's invitation link or QR code to view that round and
 its history without permission to alter player scores.
 

@@ -154,7 +154,8 @@ and versioned deliberately.
 
 The PWA displays a tee label exactly as configured by the course. Each course has one configured
 default tee, which a player can change for their round; the application does not infer a default
-from a tee's colour or number.
+from a tee's colour or number. Golf Talma Master uses tee 52 as its configured first-release
+default.
 
 For handicap calculations, a signed-in profile starts with the men's rating table as a convenience
 default. This is a calculation setting, not stored self-identified gender. The player can change
