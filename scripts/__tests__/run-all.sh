@@ -2,4 +2,8 @@
 
 set -euo pipefail
 
-"$(cd "$(dirname "$0")" && pwd)/openspec-new-change.test.sh"
+tests_dir="$(cd "$(dirname "$0")" && pwd)"
+
+"$tests_dir/openspec-new-change.test.sh"
+"$tests_dir/azure-grant-function-storage-access.test.sh"
+"$tests_dir/azure-verify-deployment.test.sh"
