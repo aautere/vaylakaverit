@@ -31,6 +31,11 @@ pnpm check
 
 See `AGENTS.md` for the working rules and `openspec/config.yaml` for the specification workflow.
 
+## Local preview
+
+The local E2E preview command will start a PWA and in-memory API without Azure credentials. It is
+implemented as part of the first product slice.
+
 ## License
 
 MIT. See `LICENSE`.

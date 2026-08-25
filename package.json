@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "pnpm --filter @vaylakaverit/web dev",
     "dev:api": "pnpm --filter @vaylakaverit/api dev",
+    "preview": "pnpm --parallel --filter @vaylakaverit/api --filter @vaylakaverit/web dev",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "build": "pnpm -r build",

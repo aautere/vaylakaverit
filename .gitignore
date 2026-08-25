@@ -4,6 +4,7 @@ build/
 coverage/
 .cache/
 infra/*.json
+apps/api/local.settings.json
 
 # Environment and secrets
 .env

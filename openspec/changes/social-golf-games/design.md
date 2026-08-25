@@ -232,6 +232,18 @@ WCAG AA conformance.
 - When a user deletes their account, the backend removes or anonymizes their identity in shared
   rounds while preserving the other participants' history.
 
+## Local preview mode
+
+Local preview runs the PWA and API without Azure, Apple sign-in, or cloud credentials. The API
+uses an in-memory store seeded with realistic Golf Talma Master rounds and a local guest identity.
+The PWA replaces QR camera scanning with a local join link, while preserving the same join-token
+and round-state flow used by production.
+
+Preview mode must cover round creation, joining from two browser sessions, score entry and
+correction, scratch and handicap match play, side games, and completed-game history. This is an
+end-to-end product test surface, not a static mockup. Preview is an internal runtime configuration;
+it does not alter or label the player-facing product experience.
+
 ## Testing strategy
 
 - Unit-test the game evaluator for scratch, handicap, tied-hole, carried-win, multi-player, and

@@ -71,6 +71,8 @@
       pending/reconnecting state, and correction feedback.
 - [ ] 5.3 Build the completed-round and completed-game history view with settings, participants,
       hole results, reward text, and final outcome.
+- [ ] 5.4 Build the Azure-independent local preview mode with an in-memory API store, local guest
+      identity, seeded Golf Talma Master round data, and shareable local join links.
 
 ## 6. Verify the release
 
@@ -79,6 +81,7 @@
 - [ ] 6.2 Add integration tests for QR joining, player limits, score authorization, invitation
       expiry, persistence, real-time updates, and reconnection.
 - [ ] 6.3 Exercise a two-to-four player round on iPhone-sized Safari viewports, including PWA
-      installation, QR joining, a side game, score correction, tie handling, and history review.
+      installation, local-link joining in preview mode, a side game, score correction, tie handling,
+      and history review.
 - [ ] 6.4 Run the selected project's formatting, type checking, tests, security checks, and
       OpenSpec validation; update the README with setup and preview instructions.

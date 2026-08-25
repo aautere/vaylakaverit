@@ -3,9 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "main": "dist/*.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "dev": "func start",
+    "dev": "pnpm build && func start --port 7071",
     "lint": "tsc -p tsconfig.json --noEmit",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --dir src --passWithNoTests"
