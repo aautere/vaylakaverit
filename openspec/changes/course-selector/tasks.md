@@ -2,15 +2,14 @@
 
 ## 1. Verify Rock Golf course data
 
-- [ ] 1.1 Obtain and record Rock Golf's official scorecard, tee labels, par, handicap indexes,
+- [x] 1.1 Obtain and record Rock Golf's official scorecard, tee labels, par, handicap indexes,
       men's rating table, men's playing-handicap lookup data, source URL, and effective date for
-      every offered round length. Rock Golf initially excludes the women's rating table. Blocked
-      until Rock Golf confirms the calculator's length discrepancy, the men's playing-handicap
-      lookup data, and the rating data's effective date; see
+      every offered round length. Rock Golf initially excludes the women's rating table. Verified
+      in the selected Rock-linked calculator snapshot; see
       `course-data/rock-golf.md`.
-- [ ] 1.2 Confirm Rock Golf's official 9- and 18-hole handicap treatment and the product default
-      tee; update the approved design and requirements if the official source changes any stated
-      assumption.
+- [x] 1.2 Confirm Rock Golf's official 9- and 18-hole handicap treatment and the product default
+      tee. The selected calculator provides the men's calculation policy; tee O is the configured
+      product default for both Rock Golf layouts.
 - [ ] 1.3 Add a versioned Rock Golf configuration only after the verified data is complete, with
       provenance and data-integrity tests for its 9-hole and two-pass 18-hole layouts.
 

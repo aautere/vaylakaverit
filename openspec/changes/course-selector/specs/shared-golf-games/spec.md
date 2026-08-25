@@ -115,3 +115,30 @@ winner SHALL retain the existing unresolved outcome.
 - **WHEN** a newer official configuration for that course is added
 - **THEN** the completed round continues to display and evaluate with its recorded version
 - **AND** newly created rounds use the newer configured version
+
+## ADDED Requirements
+
+### Requirement: Rock Golf men's playing-handicap calculation
+
+For Rock Golf, the system SHALL use the men's calculation policy delivered by the selected
+Rock-linked calculator snapshot. For an 18-hole round, it SHALL calculate the playing handicap as
+`round(Handicap Index × Slope / 113 + (Course Rating - 54))`.
+
+For a 9-hole round, it SHALL first calculate `roundToOneDecimal(Handicap Index / 2)`, then calculate
+the playing handicap as `round(rounded half index × Slope / 113 + (Course Rating - 27))`.
+Intermediate and final rounding SHALL match JavaScript `Math.round`. The system SHALL apply no
+handicap multiplier. Rock Golf SHALL use tee O as its initial default tee.
+
+#### Scenario: A player receives an 18-hole Rock Golf playing handicap
+
+- **GIVEN** a player selects Rock Golf tee O for an 18-hole round with Handicap Index 18
+- **WHEN** the system calculates their playing handicap
+- **THEN** it calculates `round(18 × 100 / 113 + (56.2 - 54))`
+- **AND** returns playing handicap 18
+
+#### Scenario: A player receives a 9-hole Rock Golf playing handicap
+
+- **GIVEN** a player selects Rock Golf tee O for a 9-hole round with Handicap Index 18
+- **WHEN** the system calculates their playing handicap
+- **THEN** it calculates `round(9.0 × 100 / 113 + (28.1 - 27))`
+- **AND** returns playing handicap 9

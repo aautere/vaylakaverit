@@ -59,11 +59,22 @@ would obscure a single round and complicate invitations, games, and history.
 Rock Golf is enabled only after an official club or course source supplies the scorecard, every tee,
 par, handicap index, rating-table values, and playing-handicap lookup needed for each offered
 layout. The import records its source and effective date and validates the data before it is exposed
-to round creation. No formula or crowd-sourced data is a fallback.
+to round creation. No unverified formula or crowd-sourced data is a fallback.
 
 This preserves the existing policy for handicap match play. Scratch play is not used as a reason to
 publish a partly configured course, because all players must be able to select valid tees and a
 round must remain coherent in history.
+
+### Rock Golf playing-handicap policy
+
+Rock Golf uses the official policy delivered by the selected calculator snapshot. For 18 holes, it
+rounds `Handicap Index × Slope / 113 + (Course Rating - 54)`. For 9 holes, it first rounds half the
+Handicap Index to one decimal, then rounds `half-index × Slope / 113 + (Course Rating - 27)`.
+Both intermediate and final operations follow the calculator's JavaScript `Math.round` behaviour.
+The source declares no handicap multiplier.
+
+This is an explicit course-specific policy, not a fallback formula. The selected calculator
+snapshot is retained with each round so a later source update does not recalculate history.
 
 ### Rock Golf rating-table scope
 
@@ -118,15 +129,5 @@ from old clients and invitation holders.
 
 ## Open Questions
 
-- Rock Golf's official site confirms its nine-hole par-3 layout, tee labels, tee lengths, and that
-  18 holes are played as two nine-hole rounds. As recorded in
-  `course-data/rock-golf.md`, eBirdie provides the official 18-hole handicap-index sequence.
-  The 9-hole layout normalizes the first-pass odd indexes to the 1–9 scale: `(first-pass index +
-  1) / 2`. Its sequence is 3, 6, 4, 8, 9, 1, 7, 2, and 5. For each physical hole, the 18-hole
-  second pass uses the first-pass index plus one, producing the even indexes. Rock Golf's linked
-  calculator provides men's rating/slope values, but its tee lengths conflict with Rock Golf's
-  published length page. Rock Golf must resolve that version difference and provide the men's
-  playing-handicap lookup data and effective date before enabling the initial configuration.
-  Women's values are intentionally outside that initial configuration.
-- Confirm whether the official source designates a preferred default tee for Rock Golf; otherwise
-  the product owner must choose one explicitly before implementation.
+None. The selected Rock-linked calculator snapshot is the initial men's-only configuration source,
+and tee O is the product default for both layouts.
