@@ -3,7 +3,7 @@ import { AppleSignInUnavailableError, type AppleTokenVerifier } from './apple.js
 import type { AuthConfig } from './config.js';
 import { JwtSessionCodec, type Session } from './session.js';
 
-const previewGuestIdPattern = /^[A-Za-z0-9_-]{1,128}$/;
+const guestIdPattern = /^[A-Za-z0-9_-]{1,128}$/;
 
 export class IdentityService {
   public constructor(
@@ -15,9 +15,9 @@ export class IdentityService {
   ) {}
 
   public sessionFromRequest(request: HttpRequest): Session | undefined {
-    if (this.config.kind === 'preview') {
+    if (this.config.kind === 'guest') {
       const guestId = request.headers.get('x-preview-guest-id') ?? 'local-guest';
-      if (!previewGuestIdPattern.test(guestId)) {
+      if (!guestIdPattern.test(guestId)) {
         return undefined;
       }
 

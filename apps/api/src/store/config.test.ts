@@ -10,11 +10,12 @@ describe('round store configuration', () => {
   });
 
   it('requires complete Cosmos settings when Cosmos is selected', () => {
-    expect(() => readRoundStoreConfig({ ROUND_STORE: 'cosmos' })).toThrow(
+    expect(() => readRoundStoreConfig({ APP_RUNTIME: 'shared-development' })).toThrow(
       'COSMOS_ENDPOINT is required',
     );
     expect(() =>
       readRoundStoreConfig({
+        APP_RUNTIME: 'shared-development',
         ROUND_STORE: 'cosmos',
         COSMOS_ENDPOINT: 'http://not-secure.example',
         COSMOS_DATABASE_ID: 'vaylakaverit',
@@ -26,6 +27,7 @@ describe('round store configuration', () => {
   it('accepts managed-identity Cosmos configuration', () => {
     expect(
       readRoundStoreConfig({
+        APP_RUNTIME: 'shared-development',
         ROUND_STORE: 'cosmos',
         COSMOS_ENDPOINT: 'https://vaylakaverit.documents.azure.com:443/',
         COSMOS_DATABASE_ID: 'vaylakaverit',
@@ -37,5 +39,11 @@ describe('round store configuration', () => {
       databaseId: 'vaylakaverit',
       containerId: 'rounds',
     });
+  });
+
+  it('prevents durable stores in local preview', () => {
+    expect(() => readRoundStoreConfig({ ROUND_STORE: 'cosmos' })).toThrow(
+      'ROUND_STORE must be "preview" when APP_RUNTIME is "local-preview".',
+    );
   });
 });

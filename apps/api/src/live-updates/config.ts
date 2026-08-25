@@ -1,5 +1,7 @@
-export type PreviewLiveUpdateConfig = {
-  kind: 'preview';
+import { readRuntimeMode } from '../runtime-config.js';
+
+export type PollingLiveUpdateConfig = {
+  kind: 'poll';
 };
 
 export type WebPubSubLiveUpdateConfig = {
@@ -8,36 +10,32 @@ export type WebPubSubLiveUpdateConfig = {
   hub: string;
 };
 
-export type LiveUpdateConfig = PreviewLiveUpdateConfig | WebPubSubLiveUpdateConfig;
+export type LiveUpdateConfig = PollingLiveUpdateConfig | WebPubSubLiveUpdateConfig;
 
 export function readLiveUpdateConfig(
   environment: NodeJS.ProcessEnv = process.env,
 ): LiveUpdateConfig {
-  const kind = environment.ROUND_UPDATE_TRANSPORT ?? defaultTransport(environment);
+  const runtimeMode = readRuntimeMode(environment);
+  const expectedTransport = runtimeMode === 'production' ? 'web-pubsub' : 'poll';
 
-  if (kind === 'preview') {
-    if (environment.ROUND_STORE === 'cosmos') {
-      throw new Error(
-        'ROUND_UPDATE_TRANSPORT "preview" is only available with ROUND_STORE "preview".',
-      );
-    }
-
-    return { kind };
+  if (
+    environment.ROUND_UPDATE_TRANSPORT &&
+    environment.ROUND_UPDATE_TRANSPORT !== expectedTransport
+  ) {
+    throw new Error(
+      `ROUND_UPDATE_TRANSPORT must be "${expectedTransport}" when APP_RUNTIME is "${runtimeMode}".`,
+    );
   }
 
-  if (kind !== 'web-pubsub') {
-    throw new Error('ROUND_UPDATE_TRANSPORT must be either "preview" or "web-pubsub".');
+  if (expectedTransport === 'poll') {
+    return { kind: 'poll' };
   }
 
   const endpoint = requiredSetting(environment, 'WEB_PUBSUB_ENDPOINT');
   const hub = requiredSetting(environment, 'WEB_PUBSUB_HUB');
   validateWebPubSubEndpoint(endpoint);
 
-  return { kind, endpoint, hub };
-}
-
-function defaultTransport(environment: NodeJS.ProcessEnv): 'preview' | 'web-pubsub' {
-  return environment.ROUND_STORE === 'cosmos' ? 'web-pubsub' : 'preview';
+  return { kind: 'web-pubsub', endpoint, hub };
 }
 
 function requiredSetting(environment: NodeJS.ProcessEnv, name: string): string {

@@ -1,3 +1,5 @@
+import { readRuntimeMode } from '../runtime-config.js';
+
 export type PreviewStoreConfig = {
   kind: 'preview';
 };
@@ -14,14 +16,15 @@ export type RoundStoreConfig = PreviewStoreConfig | CosmosStoreConfig;
 export function readRoundStoreConfig(
   environment: NodeJS.ProcessEnv = process.env,
 ): RoundStoreConfig {
-  const kind = environment.ROUND_STORE ?? 'preview';
+  const runtimeMode = readRuntimeMode(environment);
+  const expectedStore = runtimeMode === 'local-preview' ? 'preview' : 'cosmos';
 
-  if (kind === 'preview') {
-    return { kind };
+  if (environment.ROUND_STORE && environment.ROUND_STORE !== expectedStore) {
+    throw new Error(`ROUND_STORE must be "${expectedStore}" when APP_RUNTIME is "${runtimeMode}".`);
   }
 
-  if (kind !== 'cosmos') {
-    throw new Error('ROUND_STORE must be either "preview" or "cosmos".');
+  if (expectedStore === 'preview') {
+    return { kind: 'preview' };
   }
 
   const endpoint = requiredSetting(environment, 'COSMOS_ENDPOINT');
@@ -29,7 +32,7 @@ export function readRoundStoreConfig(
   const containerId = requiredSetting(environment, 'COSMOS_CONTAINER_ID');
   validateCosmosEndpoint(endpoint);
 
-  return { kind, endpoint, databaseId, containerId };
+  return { kind: 'cosmos', endpoint, databaseId, containerId };
 }
 
 function requiredSetting(environment: NodeJS.ProcessEnv, name: string): string {

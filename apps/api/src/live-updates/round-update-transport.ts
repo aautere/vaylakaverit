@@ -17,7 +17,7 @@ export interface RoundUpdateTransport {
   createConnection(roundId: string, participantId: string): Promise<LiveConnection>;
 }
 
-export class PreviewRoundUpdateTransport implements RoundUpdateTransport {
+export class PollingRoundUpdateTransport implements RoundUpdateTransport {
   public async publish(_roundId: string): Promise<void> {}
 
   public async createConnection(_roundId: string, _participantId: string): Promise<LiveConnection> {
@@ -47,8 +47,8 @@ export class WebPubSubRoundUpdateTransport implements RoundUpdateTransport {
 }
 
 export function createRoundUpdateTransport(config: LiveUpdateConfig): RoundUpdateTransport {
-  if (config.kind === 'preview') {
-    return new PreviewRoundUpdateTransport();
+  if (config.kind === 'poll') {
+    return new PollingRoundUpdateTransport();
   }
 
   return new WebPubSubRoundUpdateTransport(
