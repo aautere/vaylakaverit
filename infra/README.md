@@ -97,9 +97,9 @@ az role assignment create \
 The operator must create these versionless Key Vault secret names without placing their values in
 GitHub, Bicep parameters, or the repository:
 
-| Secret name | Required value |
-| --- | --- |
-| `apple-private-key` | The complete private `.p8` key generated for the Apple Sign In key, including line breaks. |
+| Secret name          | Required value                                                                                                                                 |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apple-private-key`  | The complete private `.p8` key generated for the Apple Sign In key, including line breaks.                                                     |
 | `session-jwt-secret` | A newly generated random secret of at least 32 characters; use at least 32 random bytes and retain it while issued sessions must remain valid. |
 
 The future Apple configuration needs the following non-secret Function App settings and Key Vault
