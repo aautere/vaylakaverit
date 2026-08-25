@@ -9,6 +9,7 @@ import {
   getRoundLiveConnectionHandler,
   getCompletedPreviewRoundHandler,
   joinPreviewRoundHandler,
+  listPreviewCoursesHandler,
   listCompletedPreviewRoundsHandler,
   recordPreviewScoreHandler,
   revokePreviewInvitationHandler,
@@ -66,6 +67,41 @@ function createRoundRequest(body: Record<string, unknown>, guestId = 'create-rou
 }
 
 describe('course selection API', () => {
+  it('lists only stable course configuration required by the selector', async () => {
+    const response = await listPreviewCoursesHandler(requestFor(''));
+
+    expect(response).toMatchObject({
+      status: 200,
+      jsonBody: expect.arrayContaining([
+        expect.objectContaining({
+          id: 'golf-talma-master',
+          version: '2017-06',
+          defaultTeeLabel: '52',
+          supportedRatingTables: ['men', 'women'],
+          layouts: [
+            expect.objectContaining({
+              id: '18-holes',
+              roundLength: 18,
+              tees: expect.any(Array),
+              holes: expect.arrayContaining([
+                expect.objectContaining({ number: 1, sourceHoleNumber: 1, pass: 1 }),
+              ]),
+            }),
+          ],
+        }),
+        expect.objectContaining({
+          id: 'rock-golf',
+          defaultTeeLabel: 'O',
+          supportedRatingTables: ['men'],
+          layouts: expect.arrayContaining([
+            expect.objectContaining({ id: '9-holes', roundLength: 9 }),
+            expect.objectContaining({ id: '18-holes', roundLength: 18 }),
+          ]),
+        }),
+      ]),
+    });
+  });
+
   it('creates a Rock Golf nine-hole round with its immutable course context', async () => {
     const response = await createPreviewRoundHandler(
       createRoundRequest({

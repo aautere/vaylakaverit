@@ -36,13 +36,13 @@
 
 ## 4. Build the course-selection flow
 
-- [ ] 4.1 Implement the accessible iPhone-first course and conditional length selector using the
+- [x] 4.1 Implement the accessible iPhone-first course and conditional length selector using the
       approved UX, visual, and Finnish copy records.
-- [ ] 4.2 Derive tee choices and defaults from the selected configuration, retain valid form input,
+- [x] 4.2 Derive tee choices and defaults from the selected configuration, retain valid form input,
       and show loading, unavailable, offline, stale-selection, validation, and success states.
-- [ ] 4.3 Show selected course and length consistently in the lobby, active-round, and history
+- [x] 4.3 Show selected course and length consistently in the lobby, active-round, and history
       views; identify Rock Golf's second pass alongside its round-hole number where needed.
-- [ ] 4.4 Add focused UI tests for selector behaviour, keyboard/focus restoration, Finnish
+- [x] 4.4 Add focused UI tests for selector behaviour, keyboard/focus restoration, Finnish
       validation/status text, and distinct Rock first- and second-pass score context.
 
 ## 5. Verify the completed flow

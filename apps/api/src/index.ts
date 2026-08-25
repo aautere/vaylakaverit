@@ -4,6 +4,7 @@ import {
   type HttpResponseInit,
   type InvocationContext,
 } from '@azure/functions';
+import { courseRegistry } from '@vaylakaverit/domain';
 import { UnavailableAppleTokenVerifier } from './auth/apple.js';
 import { readAuthConfig } from './auth/config.js';
 import { IdentityService } from './auth/identity.js';
@@ -67,6 +68,35 @@ app.http('apiOptions', {
     },
   }),
 });
+
+app.http('listPreviewCourses', {
+  methods: ['GET'],
+  authLevel: 'anonymous',
+  route: 'preview/courses',
+  handler: listPreviewCoursesHandler,
+});
+
+export async function listPreviewCoursesHandler(_request: HttpRequest): Promise<HttpResponseInit> {
+  return json(
+    courseRegistry.map((course) => ({
+      id: course.id,
+      version: course.version,
+      name: course.name,
+      defaultTeeLabel: course.defaultTeeLabel,
+      supportedRatingTables: course.supportedRatingTables,
+      layouts: course.layouts.map((layout) => ({
+        id: layout.id,
+        roundLength: layout.roundLength,
+        tees: layout.tees,
+        holes: layout.holes.map(({ number, sourceHoleNumber, pass }) => ({
+          number,
+          sourceHoleNumber,
+          pass,
+        })),
+      })),
+    })),
+  );
+}
 
 app.http('createPreviewRound', {
   methods: ['POST'],

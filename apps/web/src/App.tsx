@@ -10,13 +10,25 @@ import {
   type PendingScoreChange,
 } from './lib/score-outbox';
 import { apiUrl } from './lib/api-url';
+import {
+  courseSelectionCopy,
+  courseSelectionFocusTarget,
+  secondPassContext,
+  selectedCourseLayout,
+  selectedCourseSummary,
+  teeAndRatingForCourse,
+  type PreviewCourse,
+  type PreviewCourseSnapshot,
+  type RatingTable,
+} from './lib/course-selection';
+import { Action, Card, StatusMessage } from './ui';
 
 type PreviewPlayer = {
   id: string;
   identityId: string;
   name: string;
   teeLabel: string;
-  ratingTable: 'men' | 'women';
+  ratingTable: RatingTable;
   handicapIndex: number;
   playingHandicap: number;
   ready: boolean;
@@ -51,7 +63,12 @@ type PreviewGame = {
 
 type PreviewRound = {
   id: string;
+  courseId: string;
+  courseVersion: string;
+  layoutId: string;
+  roundLength: number;
   courseName: string;
+  courseSnapshot: PreviewCourseSnapshot;
   joinLink: string;
   invitationToken: string;
   invitationExpiresAt: string;
@@ -207,8 +224,16 @@ function App() {
   const [manualJoin, setManualJoin] = useState(false);
   const [joinLink, setJoinLink] = useState('');
   const [handicapIndex, setHandicapIndex] = useState(18);
-  const [teeLabel, setTeeLabel] = useState('52');
-  const [ratingTable, setRatingTable] = useState<'men' | 'women'>('men');
+  const [teeLabel, setTeeLabel] = useState('');
+  const [ratingTable, setRatingTable] = useState<RatingTable>('men');
+  const [courses, setCourses] = useState<PreviewCourse[]>([]);
+  const [coursesLoading, setCoursesLoading] = useState(true);
+  const [courseLoadError, setCourseLoadError] = useState(false);
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
+  const [courseSelectionIssue, setCourseSelectionIssue] = useState<string | null>(null);
+  const [courseSelectionNotice, setCourseSelectionNotice] = useState<string | null>(null);
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const [selectedLayoutId, setSelectedLayoutId] = useState<string | null>(null);
   const [gameMode, setGameMode] = useState<'scratch' | 'handicap'>('scratch');
   const [gameHoleTieRule, setGameHoleTieRule] = useState<'no-winner' | 'carry-forward'>(
     'no-winner',
@@ -240,12 +265,56 @@ function App() {
     'connecting' | 'live' | 'polling' | 'reconnecting'
   >('connecting');
   const replayInProgress = useRef(false);
+  const courseGroupRef = useRef<HTMLFieldSetElement>(null);
+  const lengthLegendRef = useRef<HTMLLegendElement>(null);
+  const courseKeyboardRef = useRef(false);
 
   const joinUrl = round ? new URL(round.joinLink, window.location.origin).toString() : '';
   const canShareInvitation = round ? isInvitationValid(round) : false;
   const isRoundCreator =
     round?.players.find((player) => player.id === activePlayerId)?.identityId ===
     round?.creatorIdentityId;
+  const courseSelection = selectedCourseLayout(courses, selectedCourseId, selectedLayoutId);
+  const selectedCourse = courseSelection && {
+    courseId: courseSelection.course.id,
+    courseVersion: courseSelection.course.version,
+    courseName: courseSelection.course.name,
+    layoutId: courseSelection.layout.id,
+    roundLength: courseSelection.layout.roundLength,
+    defaultTeeLabel: courseSelection.course.defaultTeeLabel,
+    supportedRatingTables: courseSelection.course.supportedRatingTables,
+    tees: courseSelection.layout.tees,
+    holes: courseSelection.layout.holes,
+  };
+  const formCourse =
+    (joinInvitationToken || manualJoin ? invitationRound?.courseSnapshot : selectedCourse) ??
+    undefined;
+
+  const loadCourses = useCallback(async () => {
+    setCoursesLoading(true);
+    setCourseLoadError(false);
+    try {
+      setCourses(await request<PreviewCourse[]>('/api/preview/courses'));
+    } catch {
+      setCourseLoadError(true);
+    } finally {
+      setCoursesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadCourses();
+  }, [loadCourses]);
+
+  useEffect(() => {
+    const updateOnlineStatus = () => setIsOnline(navigator.onLine);
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+    return () => {
+      window.removeEventListener('online', updateOnlineStatus);
+      window.removeEventListener('offline', updateOnlineStatus);
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -264,17 +333,35 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!joinInvitationToken || round) {
+    const invitationToken =
+      joinInvitationToken ?? (manualJoin ? getInvitationTokenFromJoinLink(joinLink) : null);
+    if (!invitationToken || round) {
       return undefined;
     }
 
     let active = true;
-    void request<PreviewRound>(
-      `/api/preview/invitations/${encodeURIComponent(joinInvitationToken)}`,
-    )
+    void request<PreviewRound>(`/api/preview/invitations/${encodeURIComponent(invitationToken)}`)
       .then((invitedRound) => {
         if (active) {
           setInvitationRound(invitedRound);
+          setTeeLabel(
+            (currentTee) =>
+              teeAndRatingForCourse(
+                invitedRound.courseSnapshot,
+                invitedRound.courseSnapshot.tees,
+                currentTee,
+                'men',
+              ).teeLabel,
+          );
+          setRatingTable(
+            (currentRatingTable) =>
+              teeAndRatingForCourse(
+                invitedRound.courseSnapshot,
+                invitedRound.courseSnapshot.tees,
+                invitedRound.courseSnapshot.defaultTeeLabel,
+                currentRatingTable,
+              ).ratingTable,
+          );
         }
       })
       .catch((requestError: unknown) => {
@@ -288,7 +375,7 @@ function App() {
     return () => {
       active = false;
     };
-  }, [joinInvitationToken, round]);
+  }, [joinInvitationToken, joinLink, manualJoin, round]);
 
   useEffect(() => {
     if (!round || !activePlayerId) {
@@ -466,13 +553,27 @@ function App() {
   async function createRound(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setCourseSelectionIssue(null);
 
+    if (!selectedCourse) {
+      setCourseSelectionIssue(courseSelectionCopy.missing);
+      courseGroupRef.current?.focus();
+      return;
+    }
+    if (!isOnline) {
+      setCourseSelectionIssue(courseSelectionCopy.offline);
+      return;
+    }
     try {
       const createdRound = await request<PreviewRound>('/api/preview/rounds', {
         name,
         handicapIndex,
         teeLabel,
         ratingTable,
+        courseId: selectedCourse.courseId,
+        courseVersion: selectedCourse.courseVersion,
+        layoutId: selectedCourse.layoutId,
+        roundLength: selectedCourse.roundLength,
         mode: gameMode,
         reward,
         holeTieRule: gameHoleTieRule,
@@ -481,8 +582,69 @@ function App() {
       setRound(createdRound);
       setActivePlayerId(createdRound.players[0]?.id ?? null);
       setCopied(false);
+      setNotice(`Kierros luotiin: ${createdRound.courseName}, ${createdRound.roundLength} reikää.`);
     } catch (requestError) {
+      if (
+        requestError instanceof ApiRequestError &&
+        requestError.status === 400 &&
+        /vanhentun|päivitty/i.test(requestError.message)
+      ) {
+        setCourseSelectionIssue(courseSelectionCopy.stale);
+        setSelectedCourseId(null);
+        setSelectedLayoutId(null);
+        void loadCourses();
+        if (courseSelectionFocusTarget(false, false, true) === 'course') {
+          window.setTimeout(() => courseGroupRef.current?.focus(), 0);
+        }
+        return;
+      }
       setError(requestError instanceof Error ? requestError.message : 'Kierrosta ei voitu luoda.');
+    }
+  }
+
+  function selectCourse(courseId: string, fromKeyboard: boolean) {
+    const course = courses.find((candidate) => candidate.id === courseId);
+    const layout = course?.layouts.length === 1 ? course.layouts[0] : undefined;
+    setSelectedCourseId(courseId);
+    setSelectedLayoutId(layout?.id ?? null);
+    setCourseSelectionIssue(null);
+    if (course && layout) {
+      const next = teeAndRatingForCourse(course, layout.tees, teeLabel, ratingTable);
+      setTeeLabel(next.teeLabel);
+      setRatingTable(next.ratingTable);
+      setCourseSelectionNotice(selectedCourseSummary(course.name, layout.roundLength));
+      if (next.ratingChanged && course.name === 'Rock Golf') {
+        setCourseSelectionIssue(courseSelectionCopy.unavailableRockRating);
+      }
+    } else if (course) {
+      setCourseSelectionNotice(null);
+      if (courseSelectionFocusTarget(true, fromKeyboard) === 'length') {
+        window.setTimeout(() => lengthLegendRef.current?.focus(), 0);
+      }
+    }
+  }
+
+  function selectLayout(layoutId: string) {
+    const selection = selectedCourseLayout(courses, selectedCourseId, layoutId);
+    if (!selection) {
+      return;
+    }
+    const next = teeAndRatingForCourse(
+      selection.course,
+      selection.layout.tees,
+      teeLabel,
+      ratingTable,
+    );
+    setSelectedLayoutId(layoutId);
+    setTeeLabel(next.teeLabel);
+    setRatingTable(next.ratingTable);
+    setCourseSelectionNotice(
+      selectedCourseSummary(selection.course.name, selection.layout.roundLength),
+    );
+    if (next.ratingChanged && selection.course.name === 'Rock Golf') {
+      setCourseSelectionIssue(courseSelectionCopy.unavailableRockRating);
+    } else {
+      setCourseSelectionIssue(null);
     }
   }
 
@@ -825,12 +987,13 @@ function App() {
                 : 'Luo kierros ja kutsu kaveri mukaan.'}
             </h2>
             <p className="mt-3 text-base leading-7 text-[#d4e5d9]">
-              Golf Talma Master, tii 52 ja pelaajat samalle kierrokselle liittymislinkillä.
+              Valitse kenttä, kokoa ryhmä ja jaa liittymislinkki kavereille.
             </p>
             {invitationRound ? (
               <div className="mt-4 rounded-xl bg-white/10 px-4 py-3 text-sm text-[#d4e5d9]">
                 <p className="font-semibold text-white">{invitationRound.courseName}</p>
                 <p className="mt-1">
+                  {selectedCourseSummary(invitationRound.courseName, invitationRound.roundLength)} ·{' '}
                   {invitationRound.players.length} / 4 pelaajaa ·{' '}
                   {invitationRound.standings.completedHoles} reikää pelattu
                 </p>
@@ -844,6 +1007,108 @@ function App() {
               className="mt-6 grid gap-3"
               onSubmit={joinInvitationToken || manualJoin ? joinRound : createRound}
             >
+              {!joinInvitationToken && !manualJoin ? (
+                <Card className="grid gap-4 !border-0 !bg-[var(--surface-raised)] !p-4 !text-[var(--text-primary)]">
+                  <h3 className="text-lg font-bold text-[var(--text-strong)]">
+                    Valitse kenttä ja kierroksen pituus
+                  </h3>
+                  <fieldset
+                    ref={courseGroupRef}
+                    aria-describedby={courseSelectionIssue ? 'course-selection-status' : undefined}
+                    className="grid gap-2 focus:outline-3 focus:outline-[var(--focus-ring)] focus:outline-offset-3"
+                    tabIndex={-1}
+                  >
+                    <legend className="text-sm font-semibold">Kenttä</legend>
+                    {coursesLoading ? (
+                      <StatusMessage tone="info">{courseSelectionCopy.loading}</StatusMessage>
+                    ) : courseLoadError ? (
+                      <div className="grid gap-2">
+                        <StatusMessage id="course-selection-status" tone="error">
+                          {courseSelectionCopy.unavailable}
+                        </StatusMessage>
+                        <Action tone="secondary" onClick={() => void loadCourses()}>
+                          Yritä uudelleen
+                        </Action>
+                      </div>
+                    ) : courses.length === 0 ? (
+                      <StatusMessage id="course-selection-status" tone="error">
+                        Kierrosta ei voi luoda, koska kenttiä ei ole saatavilla.
+                      </StatusMessage>
+                    ) : (
+                      courses.map((course) => {
+                        const isTalma = course.layouts.length === 1;
+                        return (
+                          <label
+                            key={course.id}
+                            className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-[var(--border-strong)] bg-[var(--surface-raised)] px-3 font-semibold focus-within:outline-3 focus-within:outline-[var(--focus-ring)] focus-within:outline-offset-3"
+                            onKeyDown={() => {
+                              courseKeyboardRef.current = true;
+                            }}
+                            onPointerDown={() => {
+                              courseKeyboardRef.current = false;
+                            }}
+                          >
+                            <input
+                              checked={selectedCourseId === course.id}
+                              name="course"
+                              type="radio"
+                              value={course.id}
+                              onChange={() => selectCourse(course.id, courseKeyboardRef.current)}
+                            />
+                            {isTalma
+                              ? `${course.name} · ${course.layouts[0]!.roundLength} reikää`
+                              : course.name}
+                          </label>
+                        );
+                      })
+                    )}
+                  </fieldset>
+                  {selectedCourseId === 'rock-golf' ? (
+                    <fieldset className="grid gap-2">
+                      <legend
+                        ref={lengthLegendRef}
+                        className="text-sm font-semibold focus:outline-3 focus:outline-[var(--focus-ring)] focus:outline-offset-3"
+                        tabIndex={-1}
+                      >
+                        Kierroksen pituus
+                      </legend>
+                      {courses
+                        .find((course) => course.id === selectedCourseId)
+                        ?.layouts.map((layout) => (
+                          <label
+                            key={layout.id}
+                            className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-[var(--border-strong)] bg-[var(--surface-raised)] px-3 font-semibold focus-within:outline-3 focus-within:outline-[var(--focus-ring)] focus-within:outline-offset-3"
+                          >
+                            <input
+                              checked={selectedLayoutId === layout.id}
+                              name="round-length"
+                              type="radio"
+                              value={layout.id}
+                              onChange={() => selectLayout(layout.id)}
+                            />
+                            {layout.roundLength === 18
+                              ? '18 reikää (2 × 9 reikää)'
+                              : `${layout.roundLength} reikää`}
+                          </label>
+                        ))}
+                      <p className="text-sm text-[var(--text-muted)]">
+                        Pelaat Rock Golfin yhdeksän reikää kahdesti.
+                      </p>
+                    </fieldset>
+                  ) : null}
+                  {courseSelectionNotice ? (
+                    <StatusMessage tone="success">{courseSelectionNotice}</StatusMessage>
+                  ) : null}
+                  {courseSelectionIssue ? (
+                    <StatusMessage id="course-selection-status" tone="error">
+                      {courseSelectionIssue}
+                    </StatusMessage>
+                  ) : null}
+                  {!isOnline ? (
+                    <StatusMessage tone="warning">{courseSelectionCopy.offline}</StatusMessage>
+                  ) : null}
+                </Card>
+              ) : null}
               {manualJoin && !joinInvitationToken ? (
                 <>
                   <button
@@ -866,7 +1131,10 @@ function App() {
                       id="join-link"
                       className="min-h-12 rounded-xl bg-white px-3 text-base text-[#13251f]"
                       value={joinLink}
-                      onChange={(event) => setJoinLink(event.target.value)}
+                      onChange={(event) => {
+                        setJoinLink(event.target.value);
+                        setInvitationRound(null);
+                      }}
                       placeholder="Liitä kaverin linkki tähän"
                       required
                     />
@@ -884,6 +1152,56 @@ function App() {
                   required
                 />
               </label>
+              {formCourse ? (
+                <>
+                  <Card className="grid gap-2 !border-0 !bg-[var(--surface-subtle)] !p-3 !text-[var(--text-primary)]">
+                    <p className="font-semibold">
+                      {selectedCourseSummary(formCourse.courseName, formCourse.roundLength)}
+                    </p>
+                  </Card>
+                  <label className="grid gap-2 text-sm font-semibold" htmlFor="tee-label">
+                    Tii
+                    <select
+                      id="tee-label"
+                      className="min-h-12 rounded-xl bg-white px-3 text-base text-[#13251f]"
+                      value={teeLabel}
+                      onChange={(event) => setTeeLabel(event.target.value)}
+                    >
+                      {formCourse.tees.map((tee) => (
+                        <option key={tee.label} value={tee.label}>
+                          {tee.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {formCourse.supportedRatingTables.length === 1 ? (
+                    <Card className="!border-0 !bg-[var(--surface-subtle)] !p-3 !text-[var(--text-primary)]">
+                      <p className="font-semibold">Pelitasoitustaulukko: miehet</p>
+                      <p className="mt-1 text-sm text-[var(--text-muted)]">
+                        {courseSelectionCopy.rockRating}
+                      </p>
+                    </Card>
+                  ) : (
+                    <label className="grid gap-2 text-sm font-semibold" htmlFor="rating-table">
+                      Pelitasoitustaulukko
+                      <select
+                        id="rating-table"
+                        className="min-h-12 rounded-xl bg-white px-3 text-base text-[#13251f]"
+                        value={ratingTable}
+                        onChange={(event) =>
+                          setRatingTable(event.target.value === 'women' ? 'women' : 'men')
+                        }
+                      >
+                        {formCourse.supportedRatingTables.map((table) => (
+                          <option key={table} value={table}>
+                            {table === 'women' ? 'Naisten taulukko' : 'Miesten taulukko'}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                </>
+              ) : null}
               <label className="grid gap-2 text-sm font-semibold" htmlFor="handicap-index">
                 Tasoitusindeksi
                 <input
@@ -894,35 +1212,6 @@ function App() {
                   value={handicapIndex}
                   onChange={(event) => setHandicapIndex(Number(event.target.value))}
                 />
-              </label>
-              <label className="grid gap-2 text-sm font-semibold" htmlFor="tee-label">
-                Tii
-                <select
-                  id="tee-label"
-                  className="min-h-12 rounded-xl bg-white px-3 text-base text-[#13251f]"
-                  value={teeLabel}
-                  onChange={(event) => setTeeLabel(event.target.value)}
-                >
-                  {['48', '52', '56', '60', '64'].map((label) => (
-                    <option key={label} value={label}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="grid gap-2 text-sm font-semibold" htmlFor="rating-table">
-                Pelitasoitustaulukko
-                <select
-                  id="rating-table"
-                  className="min-h-12 rounded-xl bg-white px-3 text-base text-[#13251f]"
-                  value={ratingTable}
-                  onChange={(event) =>
-                    setRatingTable(event.target.value === 'women' ? 'women' : 'men')
-                  }
-                >
-                  <option value="men">Miesten taulukko</option>
-                  <option value="women">Naisten taulukko</option>
-                </select>
               </label>
               {!joinInvitationToken && !manualJoin ? (
                 <>
@@ -989,7 +1278,16 @@ function App() {
               ) : null}
               <button
                 type="submit"
-                className="min-h-12 rounded-xl bg-[#e5b700] px-4 py-3 font-bold text-[#17231c]"
+                className="min-h-12 rounded-xl bg-[#e5b700] px-4 py-3 font-bold text-[#17231c] disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={
+                  !joinInvitationToken &&
+                  !manualJoin &&
+                  (coursesLoading ||
+                    courseLoadError ||
+                    courses.length === 0 ||
+                    !selectedCourse ||
+                    !isOnline)
+                }
               >
                 {joinInvitationToken || manualJoin ? 'Liity kierrokseen' : 'Luo kierros'}
               </button>
@@ -1021,6 +1319,7 @@ function App() {
                     >
                       <span className="block font-semibold">{historyRound.courseName}</span>
                       <span className="mt-1 block text-sm text-[#476257]">
+                        {selectedCourseSummary(historyRound.courseName, historyRound.roundLength)} ·{' '}
                         {formatCompletedDate(historyRound.completedAt)} ·{' '}
                         {formatOutcome(historyRound)}
                       </span>
@@ -1048,6 +1347,7 @@ function App() {
             <p className="text-sm font-semibold text-[#d4e5d9]">{round.courseName.toUpperCase()}</p>
             <h2 className="mt-2 text-2xl font-bold">Reikäpeli</h2>
             <p className="mt-2 text-[#d4e5d9]">
+              {selectedCourseSummary(round.courseName, round.roundLength)} ·{' '}
               {gameModeName(round.game.mode)} · {round.players.length} / 4 pelaajaa
             </p>
             {round.game.reward ? (
@@ -1165,6 +1465,11 @@ function App() {
                 korvaa vain tämän oman tuloksesi.
               </p>
             ) : null}
+            {secondPassContext(round.courseSnapshot.holes, holeNumber) ? (
+              <p className="mt-2 text-sm font-semibold text-[var(--text-muted)]">
+                {secondPassContext(round.courseSnapshot.holes, holeNumber)}
+              </p>
+            ) : null}
             {pendingScoreChanges.length > 0 ? (
               <p
                 role="status"
@@ -1186,14 +1491,19 @@ function App() {
                   value={holeNumber}
                   onChange={(event) => setHoleNumber(Number(event.target.value))}
                 >
-                  {Array.from({ length: 18 }, (_, index) => index + 1).map((hole) => (
-                    <option key={hole} value={hole}>
-                      {hole}
-                      {activePlayerId && round.scores[activePlayerId]?.[hole] !== undefined
-                        ? ` · ${round.scores[activePlayerId]![hole]} lyöntiä`
-                        : ''}
-                    </option>
-                  ))}
+                  {Array.from({ length: round.roundLength }, (_, index) => index + 1).map(
+                    (hole) => (
+                      <option key={hole} value={hole}>
+                        Reikä {hole}
+                        {secondPassContext(round.courseSnapshot.holes, hole)
+                          ? ` · ${secondPassContext(round.courseSnapshot.holes, hole)}`
+                          : ''}
+                        {activePlayerId && round.scores[activePlayerId]?.[hole] !== undefined
+                          ? ` · ${round.scores[activePlayerId]![hole]} lyöntiä`
+                          : ''}
+                      </option>
+                    ),
+                  )}
                 </select>
               </label>
               <label className="grid gap-2 text-sm font-semibold" htmlFor="strokes">
@@ -1233,7 +1543,7 @@ function App() {
                     className="min-h-12 rounded-xl border border-[#c9d6ca] px-3"
                     type="number"
                     min="1"
-                    max={19 - (upcomingHole ?? 18)}
+                    max={round.roundLength + 1 - (upcomingHole ?? round.roundLength)}
                     value={sideGameHoles}
                     onChange={(event) => setSideGameHoles(Number(event.target.value))}
                   />
@@ -1400,7 +1710,7 @@ function App() {
       ) : null}
 
       <footer className="mt-auto pt-10 text-center text-sm text-[#62776c]">
-        <p>Ensimmäinen kenttä: Golf Talma Master</p>
+        <p>Valitse kenttä ja kierroksen pituus ennen uuden kierroksen luontia.</p>
         <button
           type="button"
           className="mt-3 min-h-11 font-semibold text-[#245642] underline disabled:opacity-60"
@@ -1459,33 +1769,33 @@ function RoundLobby({
     name: string;
     handicapIndex: number;
     teeLabel: string;
-    ratingTable: 'men' | 'women';
+    ratingTable: RatingTable;
   }) => Promise<void>;
   onStartRound: () => Promise<void>;
 }) {
   const currentPlayer = round.players.find((player) => player.id === activePlayerId);
   const [playerName, setPlayerName] = useState(currentPlayer?.name ?? '');
   const [handicapIndex, setHandicapIndex] = useState(currentPlayer?.handicapIndex ?? 18);
-  const [teeLabel, setTeeLabel] = useState(currentPlayer?.teeLabel ?? '52');
-  const [ratingTable, setRatingTable] = useState<'men' | 'women'>(
-    currentPlayer?.ratingTable ?? 'men',
+  const [teeLabel, setTeeLabel] = useState(
+    currentPlayer?.teeLabel ?? round.courseSnapshot.defaultTeeLabel,
   );
+  const [ratingTable, setRatingTable] = useState<RatingTable>(currentPlayer?.ratingTable ?? 'men');
 
   useEffect(() => {
     if (!currentPlayer) {
       return;
     }
+    const playerSettings = teeAndRatingForCourse(
+      round.courseSnapshot,
+      round.courseSnapshot.tees,
+      currentPlayer.teeLabel,
+      currentPlayer.ratingTable,
+    );
     setPlayerName(currentPlayer.name);
     setHandicapIndex(currentPlayer.handicapIndex);
-    setTeeLabel(currentPlayer.teeLabel);
-    setRatingTable(currentPlayer.ratingTable);
-  }, [
-    currentPlayer?.handicapIndex,
-    currentPlayer?.id,
-    currentPlayer?.name,
-    currentPlayer?.ratingTable,
-    currentPlayer?.teeLabel,
-  ]);
+    setTeeLabel(playerSettings.teeLabel);
+    setRatingTable(playerSettings.ratingTable);
+  }, [currentPlayer, round.courseSnapshot]);
 
   const creatorPlayerId = round.creatorIdentityId
     ? round.players.find((player) => player.identityId === round.creatorIdentityId)?.id
@@ -1503,8 +1813,8 @@ function RoundLobby({
         <p className="text-sm font-semibold text-[#d4e5d9]">{round.courseName.toUpperCase()}</p>
         <h2 className="mt-2 text-2xl font-bold">Vahvista ryhmä ennen aloitusta</h2>
         <p className="mt-2 text-[#d4e5d9]">
-          {round.players.length} / 4 pelaajaa ·{' '}
-          {round.players.filter((player) => player.ready).length} valmiina
+          {selectedCourseSummary(round.courseName, round.roundLength)} · {round.players.length} / 4
+          pelaajaa · {round.players.filter((player) => player.ready).length} valmiina
         </p>
         {canShareInvitation ? (
           <>
@@ -1614,25 +1924,39 @@ function RoundLobby({
               value={teeLabel}
               onChange={(event) => setTeeLabel(event.target.value)}
             >
-              {['48', '52', '56', '60', '64'].map((label) => (
-                <option key={label} value={label}>
-                  {label}
+              {round.courseSnapshot.tees.map((tee) => (
+                <option key={tee.label} value={tee.label}>
+                  {tee.label}
                 </option>
               ))}
             </select>
           </label>
-          <label className="mt-3 grid gap-2 text-sm font-semibold" htmlFor="lobby-rating-table">
-            Pelitasoitustaulukko
-            <select
-              id="lobby-rating-table"
-              className="min-h-12 rounded-xl border border-[#c9d6ca] bg-white px-3"
-              value={ratingTable}
-              onChange={(event) => setRatingTable(event.target.value === 'women' ? 'women' : 'men')}
-            >
-              <option value="men">Miesten taulukko</option>
-              <option value="women">Naisten taulukko</option>
-            </select>
-          </label>
+          {round.courseSnapshot.supportedRatingTables.length === 1 ? (
+            <div className="mt-3 rounded-xl bg-[var(--surface-subtle)] px-3 py-3">
+              <p className="font-semibold">Pelitasoitustaulukko: miehet</p>
+              <p className="mt-1 text-sm text-[var(--text-muted)]">
+                {courseSelectionCopy.rockRating}
+              </p>
+            </div>
+          ) : (
+            <label className="mt-3 grid gap-2 text-sm font-semibold" htmlFor="lobby-rating-table">
+              Pelitasoitustaulukko
+              <select
+                id="lobby-rating-table"
+                className="min-h-12 rounded-xl border border-[#c9d6ca] bg-white px-3"
+                value={ratingTable}
+                onChange={(event) =>
+                  setRatingTable(event.target.value === 'women' ? 'women' : 'men')
+                }
+              >
+                {round.courseSnapshot.supportedRatingTables.map((table) => (
+                  <option key={table} value={table}>
+                    {table === 'women' ? 'Naisten taulukko' : 'Miesten taulukko'}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <button
             type="submit"
             className="mt-5 min-h-12 w-full rounded-xl bg-[#e5b700] px-4 py-3 font-bold text-[#17231c]"
@@ -1693,7 +2017,10 @@ function CompletedRoundHistory({
       <article className="rounded-3xl bg-[#073b2d] p-6 text-white shadow-lg shadow-[#073b2d]/15">
         <p className="text-sm font-semibold text-[#d4e5d9]">{round.courseName.toUpperCase()}</p>
         <h2 className="mt-2 text-2xl font-bold">Kierros päättyi</h2>
-        <p className="mt-2 text-[#d4e5d9]">{formatCompletedDate(round.completedAt)}</p>
+        <p className="mt-2 text-[#d4e5d9]">
+          {selectedCourseSummary(round.courseName, round.roundLength)} ·{' '}
+          {formatCompletedDate(round.completedAt)}
+        </p>
         <p className="mt-4 text-lg font-semibold">{formatOutcome(round)}</p>
         <button
           type="button"
@@ -1777,7 +2104,11 @@ function CompletedRoundHistory({
                   <ul className="mt-2 grid grid-cols-2 gap-2 text-sm">
                     {scores.map(([holeNumber, strokes]) => (
                       <li key={holeNumber} className="rounded-lg bg-white px-2 py-2">
-                        Reikä {holeNumber}: {strokes} lyöntiä
+                        Reikä {holeNumber}
+                        {secondPassContext(round.courseSnapshot.holes, Number(holeNumber))
+                          ? ` · ${secondPassContext(round.courseSnapshot.holes, Number(holeNumber))}`
+                          : ''}
+                        : {strokes} lyöntiä
                       </li>
                     ))}
                   </ul>
@@ -1916,7 +2247,7 @@ function nextUpcomingHole(round: PreviewRound): number | undefined {
     Object.keys(scores).map(Number),
   );
   const lastPlayedHole = Math.max(0, ...scoredHoleNumbers);
-  return lastPlayedHole < 18 ? lastPlayedHole + 1 : undefined;
+  return lastPlayedHole < round.roundLength ? lastPlayedHole + 1 : undefined;
 }
 
 function gameStatusName(standings: GameStanding): string {
