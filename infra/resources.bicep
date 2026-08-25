@@ -8,7 +8,7 @@ var storageName = take('${compactPrefix}${environmentName}${suffix}', 24)
 var functionAppName = '${namePrefix}-${environmentName}-api-${suffix}'
 var cosmosAccountName = '${namePrefix}-${environmentName}-cosmos-${suffix}'
 var webPubSubName = '${namePrefix}-${environmentName}-live-${suffix}'
-var keyVaultName = 'kv-${namePrefix}-${suffix}'
+var keyVaultName = 'kv-${namePrefix}-${suffix}2'
 var logAnalyticsName = '${namePrefix}-${environmentName}-logs-${suffix}'
 var applicationInsightsName = '${namePrefix}-${environmentName}-insights-${suffix}'
 var deploymentContainerName = 'function-package'
@@ -31,13 +31,6 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
 resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
   parent: storageAccount
   name: 'default'
-  properties: {
-    staticWebsite: {
-      enabled: true
-      indexDocument: 'index.html'
-      error404Document: 'index.html'
-    }
-  }
 }
 
 resource deploymentContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {

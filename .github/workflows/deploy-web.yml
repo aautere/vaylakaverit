@@ -43,6 +43,12 @@ jobs:
             --output tsv)"
           echo "storage_account_name=$storage_account_name" >> "$GITHUB_OUTPUT"
       - run: |
+          az storage blob service-properties update \
+            --auth-mode login \
+            --account-name "${{ steps.infrastructure.outputs.storage_account_name }}" \
+            --static-website true \
+            --index-document index.html \
+            --404-document index.html
           az storage blob upload-batch \
             --auth-mode login \
             --account-name "${{ steps.infrastructure.outputs.storage_account_name }}" \

@@ -45,7 +45,9 @@ grant the Function App's managed identity the required Storage data-plane roles:
 ```
 
 The script assigns `Storage Blob Data Owner`, `Storage Queue Data Contributor`, and `Storage Table
-Data Contributor` only to the created Function App identity on its backing Storage Account.
+Data Contributor` only to the created Function App identity on its backing Storage Account. It also
+grants the GitHub deployment identity `Storage Blob Data Contributor`, which is required by the
+`deploy-web` workflow to enable the static website and upload PWA files.
 
 ## Local validation
 
