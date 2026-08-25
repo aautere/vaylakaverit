@@ -8,7 +8,7 @@
       same unstarted invitation across an API-instance boundary.
 - [x] 4. Update the invitation loading, unavailable-link, offline, and join-conflict UI feedback to
       match the approved UX and Finnish copy records, with targeted UI tests.
-- [ ] 5. Document the distinction between local preview and shared public-development testing, then
+- [x] 5. Document the distinction between local preview and shared public-development testing, then
       run the relevant formatting, type, unit, integration, and OpenSpec validation.
 - [ ] 6. Perform the planned two-device published-development UX review and record the evidence and
       outcome before closing the change.
