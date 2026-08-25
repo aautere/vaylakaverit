@@ -2,6 +2,7 @@ import type { HttpRequest } from '@azure/functions';
 import { describe, expect, it } from 'vitest';
 import {
   completePreviewRoundHandler,
+  createPreviewRoundHandler,
   deleteAccountHandler,
   getPreviewInvitationHandler,
   getPreviewRoundHandler,
@@ -55,6 +56,74 @@ function startRequestFor(roundId: string, guestId: string): HttpRequest {
     headers: new Headers({ 'x-preview-guest-id': guestId }),
   } as unknown as HttpRequest;
 }
+
+function createRoundRequest(body: Record<string, unknown>, guestId = 'create-round'): HttpRequest {
+  return {
+    params: {},
+    headers: new Headers({ 'x-preview-guest-id': guestId }),
+    json: async () => body,
+  } as unknown as HttpRequest;
+}
+
+describe('course selection API', () => {
+  it('creates a Rock Golf nine-hole round with its immutable course context', async () => {
+    const response = await createPreviewRoundHandler(
+      createRoundRequest({
+        name: 'Aino',
+        handicapIndex: 18,
+        teeLabel: 'O',
+        ratingTable: 'men',
+        courseId: 'rock-golf',
+        courseVersion: '2026-08-26',
+        layoutId: '9-holes',
+        roundLength: 9,
+      }),
+    );
+
+    expect(response).toMatchObject({
+      status: 201,
+      jsonBody: {
+        courseId: 'rock-golf',
+        courseVersion: '2026-08-26',
+        layoutId: '9-holes',
+        roundLength: 9,
+        courseSnapshot: {
+          holes: expect.arrayContaining([expect.objectContaining({ number: 9, pass: 1 })]),
+        },
+      },
+    });
+  });
+
+  it('rejects unsupported Rock tables and stale course selections', async () => {
+    const unsupportedTable = await createPreviewRoundHandler(
+      createRoundRequest({
+        name: 'Aino',
+        handicapIndex: 18,
+        teeLabel: 'O',
+        ratingTable: 'women',
+        courseId: 'rock-golf',
+        layoutId: '9-holes',
+      }),
+      'unsupported-table',
+    );
+    const staleSelection = await createPreviewRoundHandler(
+      createRoundRequest({
+        name: 'Aino',
+        handicapIndex: 18,
+        courseId: 'rock-golf',
+        courseVersion: 'old',
+        layoutId: '9-holes',
+      }),
+      'stale-course',
+    );
+
+    expect(unsupportedTable).toMatchObject({
+      status: 400,
+      jsonBody: { error: 'Valitse kentälle saatavilla oleva virallinen tasoitustaulukko.' },
+    });
+    expect(staleSelection).toMatchObject({ status: 400 });
+  });
+});
 
 function readyRound(roundId: string) {
   const round = previewRoundStore.get(roundId)!;

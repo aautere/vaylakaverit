@@ -23,6 +23,13 @@ describe('relative handicap strokes', () => {
     expect(strokesOnHole(20, 3)).toBe(1);
   });
 
+  it('uses the selected nine-hole range for Rock Golf handicap strokes', () => {
+    expect(strokesOnHole(5, 5, 9)).toBe(1);
+    expect(strokesOnHole(10, 1, 9)).toBe(2);
+    expect(strokesOnHole(10, 2, 9)).toBe(1);
+    expect(() => strokesOnHole(1, 10, 9)).toThrow('between 1 and 9');
+  });
+
   it('calculates a net score from allocated strokes', () => {
     expect(netHoleScore(6, 5, 3)).toBe(5);
   });

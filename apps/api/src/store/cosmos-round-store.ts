@@ -4,6 +4,7 @@ import {
   anonymizeIdentity,
   createRound,
   finishRound,
+  hydrateRound,
   isInvitationValid,
   joinRound,
   revokeInvitation,
@@ -61,7 +62,7 @@ export class CosmosRoundStore implements RoundStore {
 
   public async get(roundId: string): Promise<Round | undefined> {
     const stored = await this.read(roundId);
-    return stored?.document.state === 'active' ? stored.document.round : undefined;
+    return stored?.document.state === 'active' ? hydrateRound(stored.document.round) : undefined;
   }
 
   public async getByInvitationToken(invitationToken: string): Promise<Round | undefined> {
@@ -77,7 +78,9 @@ export class CosmosRoundStore implements RoundStore {
       })
       .fetchAll();
 
-    return resources.map((document) => document.round).find((round) => isInvitationValid(round));
+    return resources
+      .map((document) => hydrateRound(document.round))
+      .find((round) => isInvitationValid(round));
   }
 
   public async revokeInvitation(input: RevokeInvitationInput): Promise<Round | undefined> {
@@ -166,13 +169,15 @@ export class CosmosRoundStore implements RoundStore {
       .fetchAll();
 
     return resources
-      .map((document) => document.completedRound)
+      .map((document) => hydrateRound(document.completedRound))
       .sort((left, right) => right.completedAt.localeCompare(left.completedAt));
   }
 
   public async getHistory(roundId: string): Promise<CompletedRound | undefined> {
     const stored = await this.read(roundId);
-    return stored?.document.state === 'completed' ? stored.document.completedRound : undefined;
+    return stored?.document.state === 'completed'
+      ? hydrateRound(stored.document.completedRound)
+      : undefined;
   }
 
   public async deleteIdentity(identityId: string): Promise<DeleteIdentityResult> {
@@ -185,7 +190,10 @@ export class CosmosRoundStore implements RoundStore {
     let anonymizedRoundCount = 0;
 
     for (const document of resources) {
-      const round = document.state === 'active' ? document.round : document.completedRound;
+      const round =
+        document.state === 'active'
+          ? hydrateRound(document.round)
+          : hydrateRound(document.completedRound);
       if (!anonymizeIdentity(round, identityId)) {
         continue;
       }
@@ -231,7 +239,15 @@ export class CosmosRoundStore implements RoundStore {
   ): Promise<{ document: RoundDocument; etag?: string } | undefined> {
     try {
       const { resource, etag } = await this.container.item(roundId, roundId).read<RoundDocument>();
-      return resource ? { document: resource, etag } : undefined;
+      if (!resource) {
+        return undefined;
+      }
+      if (resource.state === 'active') {
+        hydrateRound(resource.round);
+      } else {
+        hydrateRound(resource.completedRound);
+      }
+      return { document: resource, etag };
     } catch (error) {
       if (isNotFound(error)) {
         return undefined;

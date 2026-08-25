@@ -39,6 +39,7 @@ export type EvaluateMatchPlayInput = {
   holes: MatchPlayHole[];
   startHole: number;
   holeCount: number;
+  roundHoleCount?: number;
   settings: MatchPlaySettings;
   roundFinished?: boolean;
 };
@@ -52,6 +53,7 @@ export function evaluateMatchPlay({
   holes,
   startHole,
   holeCount,
+  roundHoleCount = Math.max(0, ...holes.map((hole) => hole.number)),
   settings,
   roundFinished = false,
 }: EvaluateMatchPlayInput): MatchPlayStanding {
@@ -85,7 +87,7 @@ export function evaluateMatchPlay({
   }
 
   if (currentStatus === 'extension') {
-    for (const holeNumber of range(endHole + 1, 18)) {
+    for (const holeNumber of range(endHole + 1, roundHoleCount)) {
       const hole = holes.find((candidate) => candidate.number === holeNumber);
       if (!hole || !hasScoresForEveryPlayer(hole, playerIds)) {
         break;

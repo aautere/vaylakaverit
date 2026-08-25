@@ -10,6 +10,7 @@ import {
   previewRoundStore,
   recordPreviewScore,
 } from './preview-store.js';
+import { hydrateRound, type Round } from './store/round-store.js';
 
 function readyRound(roundId: string) {
   const round = getPreviewRound(roundId)!;
@@ -246,6 +247,131 @@ describe('recordPreviewScore', () => {
 
     expect(firstResult?.scores[playerId]?.[1]).toBe(4);
     expect(replayedResult?.scores[playerId]?.[1]).toBe(4);
+  });
+
+  describe('course snapshots', () => {
+    it('enforces Rock Golf nine-hole score and side-game limits', () => {
+      const round = previewRoundStore.create({
+        identityId: 'guest:rock-aino',
+        name: 'Aino',
+        handicapIndex: 18,
+        teeLabel: 'O',
+        ratingTable: 'men',
+        courseId: 'rock-golf',
+        layoutId: '9-holes',
+        roundLength: 9,
+        mode: 'scratch',
+        reward: '',
+      });
+      const joined = previewRoundStore.join({
+        roundId: round.id,
+        invitationToken: round.invitationToken,
+        identityId: 'guest:rock-elli',
+        name: 'Elli',
+        handicapIndex: 18,
+        teeLabel: 'O',
+        ratingTable: 'men',
+      })!;
+      readyRound(round.id);
+
+      expect(round).toMatchObject({
+        courseId: 'rock-golf',
+        layoutId: '9-holes',
+        roundLength: 9,
+        courseSnapshot: {
+          holes: expect.arrayContaining([
+            expect.objectContaining({ number: 1, sourceHoleNumber: 1, pass: 1 }),
+          ]),
+        },
+      });
+      expect(
+        previewRoundStore.score({
+          roundId: round.id,
+          playerId: joined.players[0]!.id,
+          holeNumber: 10,
+          strokes: 4,
+        }),
+      ).toBeUndefined();
+      for (let holeNumber = 1; holeNumber <= 8; holeNumber += 1) {
+        previewRoundStore.score({
+          roundId: round.id,
+          playerId: joined.players[0]!.id,
+          holeNumber,
+          strokes: 4,
+        });
+      }
+      expect(
+        previewRoundStore.addSideGame({
+          roundId: round.id,
+          startHole: 9,
+          holeCount: 2,
+          mode: 'scratch',
+          reward: '',
+        }),
+      ).toBeUndefined();
+    });
+
+    it('keeps first- and second-pass Rock scores distinct in an 18-hole round', () => {
+      const round = previewRoundStore.create({
+        identityId: 'guest:rock-18-aino',
+        name: 'Aino',
+        handicapIndex: 18,
+        teeLabel: 'O',
+        ratingTable: 'men',
+        courseId: 'rock-golf',
+        layoutId: '18-holes',
+        roundLength: 18,
+        mode: 'scratch',
+        reward: '',
+      });
+      const joined = previewRoundStore.join({
+        roundId: round.id,
+        invitationToken: round.invitationToken,
+        identityId: 'guest:rock-18-elli',
+        name: 'Elli',
+        handicapIndex: 18,
+        teeLabel: 'O',
+        ratingTable: 'men',
+      })!;
+      readyRound(round.id);
+
+      previewRoundStore.score({
+        roundId: round.id,
+        playerId: joined.players[0]!.id,
+        holeNumber: 3,
+        strokes: 4,
+      });
+      previewRoundStore.score({
+        roundId: round.id,
+        playerId: joined.players[0]!.id,
+        holeNumber: 12,
+        strokes: 5,
+      });
+
+      expect(round.courseSnapshot.holes[11]).toMatchObject({
+        number: 12,
+        sourceHoleNumber: 3,
+        pass: 2,
+      });
+      expect(round.scores[joined.players[0]!.id]).toEqual({ 3: 4, 12: 5 });
+    });
+
+    it('hydrates serialized rounds without course fields as legacy Talma rounds', () => {
+      const round = createPreviewRound('Aino', 18, 'scratch', '');
+      const legacyRound = structuredClone(round) as Round;
+      delete (legacyRound as Partial<Round>).courseId;
+      delete (legacyRound as Partial<Round>).courseVersion;
+      delete (legacyRound as Partial<Round>).layoutId;
+      delete (legacyRound as Partial<Round>).roundLength;
+      delete (legacyRound as Partial<Round>).courseSnapshot;
+
+      expect(hydrateRound(legacyRound)).toMatchObject({
+        courseId: 'golf-talma-master',
+        courseVersion: '2017-06',
+        layoutId: '18-holes',
+        roundLength: 18,
+      });
+    });
   });
 
   it('recalculates scratch and handicap games after an own score correction', () => {

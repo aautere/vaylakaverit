@@ -72,46 +72,53 @@ app.http('createPreviewRound', {
   methods: ['POST'],
   authLevel: 'anonymous',
   route: 'preview/rounds',
-  handler: async (request) => {
-    const session = identityService.sessionFromRequest(request);
-    if (!session) {
-      return json({ error: 'Tunnistautuminen vaaditaan.' }, 401);
-    }
-
-    const body = await requestBody(request);
-    const name = typeof body.name === 'string' ? body.name : '';
-    const handicapIndex = typeof body.handicapIndex === 'number' ? body.handicapIndex : 18;
-    const teeLabel = typeof body.teeLabel === 'string' ? body.teeLabel : undefined;
-    const ratingTable = typeof body.ratingTable === 'string' ? body.ratingTable : undefined;
-    const mode = body.mode === 'handicap' ? 'handicap' : 'scratch';
-    const reward = typeof body.reward === 'string' ? body.reward : '';
-    const holeTieRule = body.holeTieRule === 'carry-forward' ? 'carry-forward' : 'no-winner';
-    const endTieRule = body.endTieRule === 'continue' ? 'continue' : 'draw';
-
-    if (!name.trim()) {
-      return json({ error: 'Anna pelaajan nimi.' }, 400);
-    }
-
-    try {
-      return json(
-        await roundStore.create({
-          identityId: session.subject,
-          name: name.trim(),
-          handicapIndex,
-          teeLabel,
-          ratingTable,
-          mode,
-          reward: reward.trim(),
-          holeTieRule,
-          endTieRule,
-        }),
-        201,
-      );
-    } catch (error) {
-      return json({ error: handicapErrorMessage(error) }, 400);
-    }
-  },
+  handler: createPreviewRoundHandler,
 });
+
+export async function createPreviewRoundHandler(request: HttpRequest): Promise<HttpResponseInit> {
+  const session = identityService.sessionFromRequest(request);
+  if (!session) {
+    return json({ error: 'Tunnistautuminen vaaditaan.' }, 401);
+  }
+
+  const body = await requestBody(request);
+  const name = typeof body.name === 'string' ? body.name : '';
+  const handicapIndex = typeof body.handicapIndex === 'number' ? body.handicapIndex : 18;
+  const teeLabel = typeof body.teeLabel === 'string' ? body.teeLabel : undefined;
+  const ratingTable = typeof body.ratingTable === 'string' ? body.ratingTable : undefined;
+  const courseSelection = readCourseSelection(body);
+  const mode = body.mode === 'handicap' ? 'handicap' : 'scratch';
+  const reward = typeof body.reward === 'string' ? body.reward : '';
+  const holeTieRule = body.holeTieRule === 'carry-forward' ? 'carry-forward' : 'no-winner';
+  const endTieRule = body.endTieRule === 'continue' ? 'continue' : 'draw';
+
+  if (!name.trim()) {
+    return json({ error: 'Anna pelaajan nimi.' }, 400);
+  }
+  if ('error' in courseSelection) {
+    return json({ error: courseSelection.error }, 400);
+  }
+
+  try {
+    return json(
+      await roundStore.create({
+        identityId: session.subject,
+        name: name.trim(),
+        handicapIndex,
+        teeLabel,
+        ratingTable,
+        ...courseSelection,
+        mode,
+        reward: reward.trim(),
+        holeTieRule,
+        endTieRule,
+      }),
+      201,
+    );
+  } catch (error) {
+    return json({ error: handicapErrorMessage(error) }, 400);
+  }
+}
 
 app.http('getPreviewRound', {
   methods: ['GET'],
@@ -605,6 +612,35 @@ function isRoundParticipant(
 
 function handicapErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Pelitasoitusta ei voitu määrittää.';
+}
+
+function readCourseSelection(body: Record<string, unknown>):
+  | {
+      courseId?: string;
+      courseVersion?: string;
+      layoutId?: string;
+      roundLength?: number;
+    }
+  | { error: string } {
+  const stringFields = ['courseId', 'courseVersion', 'layoutId'] as const;
+  for (const field of stringFields) {
+    if (field in body && typeof body[field] !== 'string') {
+      return { error: 'Valitse kelvollinen kenttä ja kierroksen pituus.' };
+    }
+  }
+  if (
+    'roundLength' in body &&
+    (typeof body.roundLength !== 'number' || !Number.isInteger(body.roundLength))
+  ) {
+    return { error: 'Valitse kelvollinen kenttä ja kierroksen pituus.' };
+  }
+
+  return {
+    courseId: body.courseId as string | undefined,
+    courseVersion: body.courseVersion as string | undefined,
+    layoutId: body.layoutId as string | undefined,
+    roundLength: body.roundLength as number | undefined,
+  };
 }
 
 async function publishRoundUpdate(roundId: string): Promise<void> {

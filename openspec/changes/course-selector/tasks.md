@@ -15,23 +15,23 @@
 
 ## 2. Generalize course and round data
 
-- [ ] 2.1 Introduce the typed course registry, layout, round-hole mapping, and course-version
+- [x] 2.1 Introduce the typed course registry, layout, round-hole mapping, and course-version
       snapshot in the domain package while preserving the existing Talma Master configuration.
-- [ ] 2.2 Update playing-handicap lookup, handicap-stroke allocation, score validation, and
+- [x] 2.2 Update playing-handicap lookup, handicap-stroke allocation, score validation, and
       match-play evaluation to use the selected round snapshot and its valid round-hole range.
-- [ ] 2.3 Add domain tests for Talma compatibility, Rock 9-hole validation, Rock's two-pass hole
+- [x] 2.3 Add domain tests for Talma compatibility, Rock 9-hole validation, Rock's two-pass hole
       mapping, second-pass score distinction, game-range limits, and unresolved 9-hole extensions.
 
 ## 3. Update the round API and persistence
 
-- [ ] 3.1 Extend create-round schemas, contracts, and responses with course ID, layout length,
+- [x] 3.1 Extend create-round schemas, contracts, and responses with course ID, layout length,
       course version, and round-hole context; reject unsupported or stale selections at the API
       boundary.
-- [ ] 3.2 Persist the selected course snapshot in the preview and Cosmos stores, including a
+- [x] 3.2 Persist the selected course snapshot in the preview and Cosmos stores, including a
       backward-compatible Talma 18-hole fallback for existing serialized rounds.
-- [ ] 3.3 Update player, score, side-game, live-update, completion, and history paths to use the
+- [x] 3.3 Update player, score, side-game, live-update, completion, and history paths to use the
       persisted snapshot and round length rather than Talma-specific constants.
-- [ ] 3.4 Add API and store tests for valid course creation, invalid course/length/tee rejection,
+- [x] 3.4 Add API and store tests for valid course creation, invalid course/length/tee rejection,
       legacy Talma round reads, Rock 9-hole boundaries, and stable historical course versions.
 
 ## 4. Build the course-selection flow
