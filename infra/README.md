@@ -54,6 +54,86 @@ the provisioned Web PubSub resource. The API uses its managed identity to issue 
 client tokens and publish `round:<round-id>` group events; it does not use a Web PubSub key or
 connection string.
 
+## Apple Sign In and guest-session preparation
+
+Apple Sign In is intentionally not enabled in a deployed environment yet. The API's current Apple
+token verifier rejects every token, and it has no Apple redirect callback. Do not register an
+invented return URL, set `AUTH_MODE=apple`, or describe the `/auth/apple` endpoint as working Apple
+login until a production verifier and browser sign-in flow have been implemented and reviewed.
+
+The Function App uses a system-assigned managed identity. Once the Apple flow is implemented, an
+Azure RBAC administrator must grant that identity `Key Vault Secrets User` on the environment's
+Key Vault before configuring the Function App's Key Vault references:
+
+```bash
+environment=development
+deployment_name="vaylakaverit-${environment}"
+resource_group="rg-vaylakaverit"
+function_app_name="$(az deployment sub show \
+  --name "$deployment_name" \
+  --query properties.outputs.functionAppName.value \
+  --output tsv)"
+key_vault_name="$(az deployment sub show \
+  --name "$deployment_name" \
+  --query properties.outputs.keyVaultName.value \
+  --output tsv)"
+function_principal_id="$(az functionapp identity show \
+  --resource-group "$resource_group" \
+  --name "$function_app_name" \
+  --query principalId \
+  --output tsv)"
+key_vault_id="$(az keyvault show \
+  --name "$key_vault_name" \
+  --query id \
+  --output tsv)"
+
+az role assignment create \
+  --assignee-object-id "$function_principal_id" \
+  --assignee-principal-type ServicePrincipal \
+  --role "Key Vault Secrets User" \
+  --scope "$key_vault_id"
+```
+
+The operator must create these versionless Key Vault secret names without placing their values in
+GitHub, Bicep parameters, or the repository:
+
+| Secret name | Required value |
+| --- | --- |
+| `apple-private-key` | The complete private `.p8` key generated for the Apple Sign In key, including line breaks. |
+| `session-jwt-secret` | A newly generated random secret of at least 32 characters; use at least 32 random bytes and retain it while issued sessions must remain valid. |
+
+The future Apple configuration needs the following non-secret Function App settings and Key Vault
+references. `APPLE_CLIENT_ID` is the Apple Service ID, while `APPLE_TEAM_ID` and `APPLE_KEY_ID`
+are the associated ten-character Apple identifiers. The Key Vault URLs are intentionally
+versionless so normal secret rotation can take effect after the Function App refreshes its
+references.
+
+```bash
+az functionapp config appsettings set \
+  --resource-group "$resource_group" \
+  --name "$function_app_name" \
+  --settings \
+    AUTH_MODE=apple \
+    APPLE_CLIENT_ID='<Apple Service ID>' \
+    APPLE_TEAM_ID='<Apple Team ID>' \
+    APPLE_KEY_ID='<Apple key ID>' \
+    "APPLE_PRIVATE_KEY=@Microsoft.KeyVault(SecretUri=https://${key_vault_name}.vault.azure.net/secrets/apple-private-key/)" \
+    "SESSION_JWT_SECRET=@Microsoft.KeyVault(SecretUri=https://${key_vault_name}.vault.azure.net/secrets/session-jwt-secret/)"
+```
+
+Apple Developer Portal work remains blocked until an approved browser callback flow exists. At that
+point, create or select the Apple Service ID whose identifier becomes `APPLE_CLIENT_ID`, associate
+it with the deployed PWA host, and register only the HTTPS return URL handled by that new callback
+route. The current JSON-only `POST /api/auth/apple` route is not a return URL and must not be
+entered in Apple Developer Portal.
+
+Production device-bound guest sessions are also not configured yet. Preview guests use a
+browser-local identifier only in preview mode; the deployed API accepts no guest-session issuance
+path. A production implementation must issue and verify a signed, device-local guest credential
+using `session-jwt-secret`, collect the guest display name during create or join, and retain the
+existing round-participant and own-score authorization checks. It must not accept
+`x-preview-guest-id` outside preview mode.
+
 ## Local validation
 
 ```bash
