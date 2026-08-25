@@ -1,8 +1,8 @@
 # Implementation Tasks
 
-- [ ] 1. Add explicit local-preview, shared-development-guest, and production runtime configuration
+- [x] 1. Add explicit local-preview, shared-development-guest, and production runtime configuration
       rules, with configuration tests that prevent guest mode in production.
-- [ ] 2. Configure the published development API to use Cosmos-backed rounds and polling while
+- [x] 2. Configure the published development API to use Cosmos-backed rounds and polling while
       retaining device-local guest identities; retain local in-memory preview behaviour.
 - [ ] 3. Add durable-store API integration coverage for a creator and a separate guest joining the
       same unstarted invitation across an API-instance boundary.

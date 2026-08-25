@@ -35,10 +35,11 @@ pnpm's default symlinked store, and fails if unexpected symlinks remain. A symli
 deploys successfully but leaves the Node worker unable to resolve `@azure/functions`, so the host
 starts and reports healthy while indexing zero functions.
 
-Development uses the non-persistent preview store, guest identity, and polling transport so it
-does not require Apple credentials or data-plane access to Cosmos DB and Web PubSub. Production
-uses Cosmos DB, Apple authentication, and Web PubSub; configure its Apple settings through secure
-runtime configuration before deployment.
+Local preview uses an in-memory store, guest identity, and polling without Azure resources.
+Published development uses Cosmos DB, device-local pseudonymous guest identities, and polling so
+testers can create and join the same round from separate devices. Production uses Cosmos DB, Apple
+authentication, and Web PubSub; configure its Apple settings through secure runtime configuration
+before deployment.
 
 ## Cost guardrails
 
@@ -73,6 +74,7 @@ grant the Function App's managed identity the required Storage data-plane roles:
   <resource-group> \
   <function-app-name> \
   <storage-account-name> \
+  <cosmos-account-name> \
   <application-insights-name> \
   <github-actions-client-id>
 ```
@@ -88,8 +90,10 @@ az deployment sub show \
 
 The script assigns `Storage Blob Data Owner`, `Storage Queue Data Contributor`, and `Storage Table
 Data Contributor` only to the created Function App identity on its backing Storage Account. It also
-grants the GitHub deployment identity `Storage Blob Data Contributor`, which is required by the
-`deploy-web` workflow to enable the static website and upload PWA files.
+assigns the built-in Cosmos DB Data Contributor role to that identity, allowing both published
+development and production APIs to persist rounds. The script grants the GitHub deployment identity
+`Storage Blob Data Contributor`, which is required by the `deploy-web` workflow to enable the static
+website and upload PWA files.
 
 The script additionally grants the Function App identity `Monitoring Metrics Publisher` on the
 Application Insights component. Application Insights has local authentication disabled, so without
