@@ -104,7 +104,10 @@ from old clients and invitation holders.
 
 ## Open Questions
 
-- Record Rock Golf's official source URL, effective date, tee labels, and separate 9- and 18-hole
-  playing-handicap tables or written derivation guidance before enabling the configuration.
+- Rock Golf's official site and its linked handicap calculator confirm its 9- and 18-hole layouts,
+  tee labels, lengths, par, course ratings, and slope ratings. As recorded in
+  `rock-golf-source-verification.md`, the calculator currently omits every hole-handicap index and
+  does not publish the required playing-handicap lookup table. Rock Golf must publish or confirm
+  those values, including their effective date, before enabling the configuration.
 - Confirm whether the official source designates a preferred default tee for Rock Golf; otherwise
   the product owner must choose one explicitly before implementation.
