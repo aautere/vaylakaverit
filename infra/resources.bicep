@@ -6,10 +6,9 @@ var suffix = toLower(take(uniqueString(subscription().id, resourceGroup().id, en
 var compactPrefix = replace(namePrefix, '-', '')
 var storageName = take('${compactPrefix}${environmentName}${suffix}', 24)
 var functionAppName = '${namePrefix}-${environmentName}-api-${suffix}'
-var staticWebAppName = '${namePrefix}-${environmentName}-web-${suffix}'
 var cosmosAccountName = '${namePrefix}-${environmentName}-cosmos-${suffix}'
 var webPubSubName = '${namePrefix}-${environmentName}-live-${suffix}'
-var keyVaultName = take('${namePrefix}-${environmentName}-kv-${suffix}', 24)
+var keyVaultName = 'kv-${namePrefix}-${suffix}2'
 var logAnalyticsName = '${namePrefix}-${environmentName}-logs-${suffix}'
 var applicationInsightsName = '${namePrefix}-${environmentName}-insights-${suffix}'
 var deploymentContainerName = 'function-package'
@@ -64,6 +63,18 @@ resource applicationInsights 'Microsoft.Insights/components@2020-02-02' = {
   }
 }
 
+resource applicationInsightsBilling 'Microsoft.Insights/components/currentbillingfeatures@2015-05-01' = {
+  parent: applicationInsights
+  name: 'CurrentBillingFeatures'
+  properties: {
+    dataVolumeCap: {
+      cap: json('0.1')
+      stopSendNotificationWhenHitCap: true
+      stopSendNotificationWhenHitThreshold: true
+    }
+  }
+}
+
 resource functionPlan 'Microsoft.Web/serverfarms@2024-04-01' = {
   name: '${namePrefix}-${environmentName}-flex-${suffix}'
   location: location
@@ -102,7 +113,7 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
         version: '22'
       }
       scaleAndConcurrency: {
-        maximumInstanceCount: 20
+        maximumInstanceCount: 5
         instanceMemoryMB: 512
       }
     }
@@ -123,6 +134,14 @@ resource functionAppSettings 'Microsoft.Web/sites/config@2024-04-01' = {
     AzureWebJobsStorage__tableServiceUri: storageAccount.properties.primaryEndpoints.table
     APPLICATIONINSIGHTS_CONNECTION_STRING: applicationInsights.properties.ConnectionString
     APPLICATIONINSIGHTS_AUTHENTICATION_STRING: 'Authorization=AAD'
+    ROUND_STORE: 'cosmos'
+    COSMOS_ENDPOINT: cosmosAccount.properties.documentEndpoint
+    COSMOS_DATABASE_ID: cosmosDatabase.name
+    COSMOS_CONTAINER_ID: roundsContainer.name
+    ROUND_UPDATE_TRANSPORT: 'web-pubsub'
+    WEB_PUBSUB_ENDPOINT: 'https://${webPubSub.name}.webpubsub.azure.com'
+    WEB_PUBSUB_HUB: 'rounds'
+    WEB_ORIGIN: join(take(split(storageAccount.properties.primaryEndpoints.web, '/'), 3), '/')
   }
 }
 
@@ -136,6 +155,7 @@ resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2023-11-15' = {
       {
         locationName: location
         failoverPriority: 0
+        isZoneRedundant: false
       }
     ]
     capabilities: [
@@ -203,66 +223,10 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
   }
 }
 
-resource staticWebApp 'Microsoft.Web/staticSites@2023-12-01' = {
-  name: staticWebAppName
-  location: location
-  sku: {
-    name: 'Free'
-    tier: 'Free'
-  }
-  properties: {
-    stagingEnvironmentPolicy: 'Enabled'
-  }
-}
-
-var roleDefinitionIds = {
-  storageBlobDataOwner: subscriptionResourceId(
-    'Microsoft.Authorization/roleDefinitions',
-    'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
-  )
-  storageQueueDataContributor: subscriptionResourceId(
-    'Microsoft.Authorization/roleDefinitions',
-    '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
-  )
-  storageTableDataContributor: subscriptionResourceId(
-    'Microsoft.Authorization/roleDefinitions',
-    '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
-  )
-}
-
-resource storageBlobRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(storageAccount.id, functionApp.id, roleDefinitionIds.storageBlobDataOwner)
-  scope: storageAccount
-  properties: {
-    principalId: functionApp.identity.principalId
-    principalType: 'ServicePrincipal'
-    roleDefinitionId: roleDefinitionIds.storageBlobDataOwner
-  }
-}
-
-resource storageQueueRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(storageAccount.id, functionApp.id, roleDefinitionIds.storageQueueDataContributor)
-  scope: storageAccount
-  properties: {
-    principalId: functionApp.identity.principalId
-    principalType: 'ServicePrincipal'
-    roleDefinitionId: roleDefinitionIds.storageQueueDataContributor
-  }
-}
-
-resource storageTableRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(storageAccount.id, functionApp.id, roleDefinitionIds.storageTableDataContributor)
-  scope: storageAccount
-  properties: {
-    principalId: functionApp.identity.principalId
-    principalType: 'ServicePrincipal'
-    roleDefinitionId: roleDefinitionIds.storageTableDataContributor
-  }
-}
-
-output staticWebAppName string = staticWebApp.name
 output functionAppName string = functionApp.name
 output functionAppUrl string = 'https://${functionApp.properties.defaultHostName}'
 output cosmosAccountName string = cosmosAccount.name
 output webPubSubName string = webPubSub.name
 output keyVaultName string = keyVault.name
+output storageAccountName string = storageAccount.name
+output staticWebsiteEndpoint string = storageAccount.properties.primaryEndpoints.web

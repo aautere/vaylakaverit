@@ -4,11 +4,13 @@
   "private": true,
   "packageManager": "pnpm@9.12.0",
   "engines": {
-    "node": ">=22.0.0"
+    "node": "22.x"
   },
   "scripts": {
     "dev": "pnpm --filter @vaylakaverit/web dev",
     "dev:api": "pnpm --filter @vaylakaverit/api dev",
+    "preview": "bash scripts/with-node22.sh pnpm --parallel --filter @vaylakaverit/api --filter @vaylakaverit/web dev",
+    "e2e": "bash scripts/with-node22.sh playwright test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "build": "pnpm -r build",
@@ -23,6 +25,7 @@
   },
   "devDependencies": {
     "@fission-ai/openspec": "1.1.1",
+    "@playwright/test": "^1.62.1",
     "husky": "^9.1.0",
     "prettier": "^3.3.3"
   }

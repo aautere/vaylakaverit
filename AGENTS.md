@@ -24,6 +24,35 @@ For every new capability or materially changed behaviour:
 
 Small editorial fixes that do not alter user-visible behaviour may skip OpenSpec.
 
+## Execution boundaries
+
+- If the user names a task or task IDs, implement only that scope.
+- If the user requests implementation without naming a task, ask which approved task to start, or
+  propose the first ready task and wait for approval.
+- Do not start more than one OpenSpec task at a time unless the user explicitly authorizes parallel
+  work.
+- When delegating a task, do not overlap with the delegated scope. Do not begin another task while
+  waiting unless the user explicitly approves parallel work.
+- Perform only the validation required to complete the active task.
+- After the active task is complete, report the result and wait for the user's next instruction.
+
+## Completion protocol
+
+A task is not complete until its scoped changes have been committed and pushed.
+
+1. Run only the active task's required validation.
+2. Stage only files within the active task's approved scope.
+3. Create a focused commit.
+4. Push the commit to the tracked remote branch.
+5. Verify the pushed commit with `git log -1` and `git status --short`.
+6. Report the commit SHA and remote branch.
+
+If commit or push fails:
+
+- Mark the task as blocked, not complete.
+- Report the exact blocking command and files.
+- Do not bypass hooks, stage unrelated files, amend another task's commit, or claim the work is ready.
+
 ## Specification rules
 
 - Use concise, kebab-case change names, such as `record-round-scores`.
@@ -40,6 +69,9 @@ Small editorial fixes that do not alter user-visible behaviour may skip OpenSpec
 - Add targeted tests for business rules, calculations, and non-trivial transformations.
 - Keep secrets in local environment files only; never commit them.
 - Run the smallest relevant checks before saying work is ready.
+- After each validated, logical implementation slice, create and push a focused commit before
+  starting the next slice. Do not let separate completed features accumulate in one uncommitted
+  change set.
 
 ## Repository conventions
 

@@ -12,7 +12,7 @@ param location string = 'swedencentral'
 @description('A short resource-name prefix. Use lowercase letters and numbers only.')
 param namePrefix string = 'vaylakaverit'
 
-var resourceGroupName = '${namePrefix}-${environmentName}-rg'
+var resourceGroupName = 'rg-${namePrefix}'
 
 resource resourceGroup 'Microsoft.Resources/resourceGroups@2024-11-01' = {
   name: resourceGroupName
@@ -35,5 +35,6 @@ module application 'resources.bicep' = {
 }
 
 output resourceGroupName string = resourceGroup.name
-output staticWebAppName string = application.outputs.staticWebAppName
+output staticWebsiteEndpoint string = application.outputs.staticWebsiteEndpoint
 output functionAppName string = application.outputs.functionAppName
+output storageAccountName string = application.outputs.storageAccountName

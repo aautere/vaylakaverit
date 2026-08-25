@@ -81,6 +81,10 @@ The first release SHALL use Azure Web PubSub Free tier for live participant upda
 the service to 20 concurrent participant connections. The system SHALL alert the operator before
 the connection cap is reached so the service can be upgraded to Standard tier.
 
+The system SHALL use Free, serverless, locally redundant, or minimum-instance Azure service tiers
+where they meet the approved requirements. Application Insights telemetry SHALL have a daily data
+ingestion cap.
+
 #### Scenario: Demand returns after an idle period
 
 - **GIVEN** the service has no active rounds and idle capacity has scaled to zero
@@ -139,3 +143,23 @@ access to primary round actions.
 - **GIVEN** a player uses a supported iPhone browser in bright outdoor conditions
 - **WHEN** they open the active-round score entry view
 - **THEN** the primary score controls are readable, reachable with one hand, and operable by touch
+
+### Requirement: Azure-independent local preview
+
+The system SHALL provide a local preview mode that runs the PWA and API without Azure resources,
+Apple sign-in, or cloud credentials.
+
+Preview mode SHALL use realistic in-memory Golf Talma Master round data, a local guest identity,
+and a shareable local join link in place of QR scanning. It SHALL support end-to-end testing of
+round creation, joining, score entry and correction, scratch and handicap match-play standings,
+and completed-game history.
+
+Preview mode SHALL preserve the production user-facing labels and flows. It SHALL NOT expose
+preview, E2E, mock-data, or test-mode labels to a player.
+
+#### Scenario: A developer previews a complete round locally
+
+- **GIVEN** a developer starts the documented local preview command
+- **WHEN** they create a round and open its local join link in another browser session
+- **THEN** the sessions can join the same in-memory round without Azure resources
+- **AND** they can complete, correct, and review the game's results

@@ -1,0 +1,135 @@
+:root {
+  --surface-page: #f7f8f4;
+  --surface-raised: #ffffff;
+  --surface-subtle: #f1f5ef;
+  --surface-inverse: #073b2d;
+  --text-primary: #13251f;
+  --text-strong: #073b2d;
+  --text-muted: #476257;
+  --text-inverse: #ffffff;
+  --text-inverse-muted: #d4e5d9;
+  --border-subtle: #d8e2d8;
+  --border-strong: #c9d6ca;
+  --action-primary: #e5b700;
+  --action-primary-text: #17231c;
+  --status-info-surface: #e8f0f8;
+  --status-info-text: #16436d;
+  --status-success-surface: #e1f1e6;
+  --status-success-text: #245642;
+  --status-warning-surface: #fff5c2;
+  --status-warning-text: #6d5100;
+  --status-danger-surface: #f9e2e2;
+  --status-danger-text: #8a1f1f;
+  --focus-ring: #e5b700;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --radius-control: 0.75rem;
+  --radius-card: 1.5rem;
+  --elevation-card: 0 1px 2px rgb(7 59 45 / 0.08);
+}
+
+.ui-action {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  padding: var(--space-3) var(--space-4);
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.ui-action--primary {
+  background: var(--action-primary);
+  color: var(--action-primary-text);
+}
+
+.ui-action--secondary {
+  border-color: var(--border-strong);
+  background: var(--surface-raised);
+  color: var(--text-strong);
+}
+
+.ui-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.ui-field {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.ui-field__label {
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.ui-field__control {
+  min-height: 2.75rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  padding: 0 var(--space-3);
+}
+
+.ui-field__hint,
+.ui-field__error {
+  font-size: 0.875rem;
+}
+
+.ui-field__hint {
+  color: var(--text-muted);
+}
+
+.ui-field__error {
+  color: var(--status-danger-text);
+}
+
+.ui-card {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--surface-raised);
+  box-shadow: var(--elevation-card);
+  padding: var(--space-5);
+}
+
+.ui-status {
+  border-radius: var(--radius-control);
+  padding: var(--space-3);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.ui-status--info {
+  background: var(--status-info-surface);
+  color: var(--status-info-text);
+}
+
+.ui-status--success {
+  background: var(--status-success-surface);
+  color: var(--status-success-text);
+}
+
+.ui-status--warning {
+  background: var(--status-warning-surface);
+  color: var(--status-warning-text);
+}
+
+.ui-status--error {
+  background: var(--status-danger-surface);
+  color: var(--status-danger-text);
+}
+
+.ui-action:focus-visible,
+.ui-field__control:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
+}

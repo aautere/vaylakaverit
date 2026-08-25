@@ -26,9 +26,9 @@
 ```mermaid
 flowchart LR
   GH[GitHub repository] -->|GitHub Actions OIDC| AZ[Azure resource group]
-  P1[Player iPhone PWA] --> SWA[Azure Static Web Apps]
-  P2[Player iPhone PWA] --> SWA
-  P3[Player iPhone PWA] --> SWA
+  P1[Player iPhone PWA] --> WEB[Azure Storage Static Website]
+  P2[Player iPhone PWA] --> WEB
+  P3[Player iPhone PWA] --> WEB
   P1 <-->|HTTPS API| API[Azure Functions Flex Consumption]
   P2 <-->|HTTPS API| API
   P3 <-->|HTTPS API| API
@@ -39,7 +39,7 @@ flowchart LR
   API --> KV[Azure Key Vault]
   API --> APPLE[Apple identity provider]
   API --> WPS
-  AZ --- SWA
+  AZ --- WEB
   AZ --- API
   AZ --- DB
   AZ --- WPS
@@ -50,7 +50,7 @@ flowchart LR
 
 | Azure service                        | Responsibility                                                                                                                                                                                                 |
 | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Azure Static Web Apps                | Serves the PWA globally over HTTPS, including installable web-app assets.                                                                                                                                      |
+| Azure Storage Static Website         | Serves the installable PWA as static assets from Sweden Central.                                                                                                                                               |
 | Azure Functions Flex Consumption     | Runs the HTTP API, score validation, game evaluation, invitation handling, and real-time event publication. It scales application compute to zero when idle.                                                   |
 | Azure Cosmos DB serverless           | Persists player, round, score, game, invitation, and history records with request-based capacity.                                                                                                              |
 | Azure Web PubSub                     | Delivers authenticated low-latency round updates to active round participants without application-managed WebSocket servers. The first release uses the Free tier, capped at 20 concurrent client connections. |
@@ -62,6 +62,12 @@ environment uses a region close to Finnish users, subject to service availabilit
 implementation must verify the region, SKU availability, cold-start behaviour, and idle cost
 against the one-second update objective before production deployment.
 
+Cost guardrails are encoded in Bicep: Storage Static Website and Web PubSub use their lowest-cost
+tiers,
+Functions uses 512 MB Flex Consumption instances with no always-ready instances and a maximum of
+five concurrent instances, Cosmos DB is serverless and non-zonal, Storage is Standard LRS, and
+Application Insights stops telemetry after 0.1 GB of daily ingestion.
+
 The PWA renders the round, accepts the current player's score input, displays a creator's QR
 code, and subscribes to the round's live updates. It keeps a durable local outbox for a player's
 own pending score changes during a temporary connection loss. It never decides a shared game's
@@ -71,7 +77,9 @@ The backend exposes a small round-scoped API:
 
 - create a round and its initial players;
 - issue and consume an opaque QR invitation;
-- set player profile, tee, and handicap index;
+- hold a pre-play lobby where each participant confirms their own name, tee, handicap index, and
+  rating table;
+- start a ready two-to-four-player lobby as the round creator;
 - create and configure games;
 - enter or correct a player's own score;
 - read live round state and completed history.
@@ -79,6 +87,14 @@ The backend exposes a small round-scoped API:
 Each score mutation is authorized against the participant identity, persisted, evaluated by the
 game engine, and published as a round update. This makes corrections deterministic and ensures a
 reconnecting phone receives the same result as the phones that stayed connected.
+
+New rounds are persisted in a `lobby` state. A lobby records its creator and a readiness flag for
+each player. Changing a player's own required settings clears that flag unless the same mutation
+explicitly reconfirms readiness. The server alone transitions a round from `lobby` to `active`,
+after verifying that the creator made the request, the group has two to four ready players, and
+the main game settings are valid. Score and side-game writes are rejected before that transition.
+Both the in-memory preview store and Cosmos store preserve this state and use the same domain
+validation.
 
 ### Source control and delivery
 
@@ -92,8 +108,13 @@ minimal deployment and runtime secrets.
 
 GitHub Actions deploys approved changes to Azure using OpenID Connect federation and least-privilege
 Azure roles. No long-lived Azure credentials are stored in GitHub. Development and production use
-separate Azure resource groups and application configuration. Production deployment requires an
-explicit approval step.
+separate application resources and configuration in the shared CAF-named `rg-vaylakaverit`
+resource group. Production deployment requires an explicit approval step.
+
+The GitHub deployment identity has Contributor access only. The Bicep deployment deliberately does
+not create Azure RBAC role assignments. After provisioning, an Azure RBAC administrator runs the
+repository's `azure-grant-function-storage-access.sh` harness script to assign the Function App's
+managed identity the three required Storage data-plane roles on its backing account.
 
 ## Identity and access
 
@@ -102,10 +123,11 @@ A guest receives a limited, device-bound session that can join a round by QR cod
 only their own scores. The final implementation must define whether and how a guest can later
 claim their history after creating an Apple account.
 
-The QR code contains an opaque, high-entropy sharing URL or token. Its bearer may view the shared
-round and history, but cannot alter scores. The round owner must be able to revoke or replace the
-token. The backend enforces the two-to-four player limit and authorizes every score mutation
-rather than trusting the client.
+The QR code contains an opaque 256-bit sharing token. It expires 24 hours after issuance, and the
+creator can revoke it earlier. Public invitation lookup and joining accept a token only while it is
+both unexpired and unrevoked; its bearer may view the shared round but cannot alter scores or obtain
+a live participant connection. The backend enforces the two-to-four player limit and authorizes
+every score mutation rather than trusting the client.
 
 ## Data model
 
@@ -220,6 +242,18 @@ WCAG AA conformance.
   the client communicates that the live view is reconnecting.
 - When a user deletes their account, the backend removes or anonymizes their identity in shared
   rounds while preserving the other participants' history.
+
+## Local preview mode
+
+Local preview runs the PWA and API without Azure, Apple sign-in, or cloud credentials. The API
+uses an in-memory store seeded with realistic Golf Talma Master rounds and a local guest identity.
+The PWA replaces QR camera scanning with a local join link, while preserving the same join-token
+and round-state flow used by production.
+
+Preview mode must cover round creation, joining from two browser sessions, score entry and
+correction, scratch and handicap match play, side games, and completed-game history. This is an
+end-to-end product test surface, not a static mockup. Preview is an internal runtime configuration;
+it does not alter or label the player-facing product experience.
 
 ## Testing strategy
 

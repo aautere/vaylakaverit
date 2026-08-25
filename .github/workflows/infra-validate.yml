@@ -16,5 +16,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: azure/setup-bicep@v2
-      - run: bicep build infra/main.bicep
+      - run: az bicep install && az bicep build --file infra/main.bicep
