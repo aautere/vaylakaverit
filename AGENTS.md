@@ -40,6 +40,9 @@ Small editorial fixes that do not alter user-visible behaviour may skip OpenSpec
 - Add targeted tests for business rules, calculations, and non-trivial transformations.
 - Keep secrets in local environment files only; never commit them.
 - Run the smallest relevant checks before saying work is ready.
+- After each validated, logical implementation slice, create and push a focused commit before
+  starting the next slice. Do not let separate completed features accumulate in one uncommitted
+  change set.
 
 ## Repository conventions
 
