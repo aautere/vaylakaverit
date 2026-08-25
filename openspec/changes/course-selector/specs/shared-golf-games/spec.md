@@ -86,6 +86,13 @@ winner SHALL retain the existing unresolved outcome.
 - **THEN** it uses the official handicap index 8 recorded for round hole 12
 - **AND** it does not reuse the handicap index from round hole 3
 
+#### Scenario: A 9-hole round uses the first-pass handicap indexes
+
+- **GIVEN** a Rock Golf 9-hole round is configured
+- **WHEN** the system evaluates a handicap game on its first hole
+- **THEN** it uses the official handicap index 5 recorded for the first pass of round hole 1
+- **AND** it does not require the second-pass handicap indexes
+
 #### Scenario: A 9-hole game cannot extend past the round
 
 - **GIVEN** a Rock Golf 9-hole game's end-tie rule is continue-until-winner

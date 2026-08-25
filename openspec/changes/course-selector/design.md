@@ -108,7 +108,8 @@ from old clients and invitation holders.
 - Rock Golf's official site confirms its nine-hole par-3 layout, tee labels, tee lengths, and that
   18 holes are played as two nine-hole rounds. As recorded in
   `course-data/rock-golf.md`, eBirdie provides the official 18-hole handicap-index sequence.
-  Rock Golf must still publish or confirm the 9-hole handicap indexes, rating/slope tables,
-  playing-handicap lookup data, and their effective date before enabling the configuration.
+  The 9-hole layout uses the first-pass values from that card, while the second pass has its own
+  indexes. Rock Golf must still publish or confirm rating/slope tables, playing-handicap lookup
+  data, and their effective date before enabling the configuration.
 - Confirm whether the official source designates a preferred default tee for Rock Golf; otherwise
   the product owner must choose one explicitly before implementation.
