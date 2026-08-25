@@ -1,0 +1,61 @@
+name: Deploy API
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Azure environment to deploy
+        required: true
+        type: choice
+        options:
+          - development
+          - production
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: |
+          pnpm --filter @vaylakaverit/domain build
+          pnpm --filter @vaylakaverit/api build
+          pnpm --filter @vaylakaverit/api deploy --prod api-package
+          (
+            cd api-package
+            zip --quiet --recurse-paths ../api-package.zip .
+          )
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - id: infrastructure
+        run: |
+          resource_group_name="$(az deployment sub show \
+            --name vaylakaverit-${{ inputs.environment }} \
+            --query properties.outputs.resourceGroupName.value \
+            --output tsv)"
+          function_app_name="$(az deployment sub show \
+            --name vaylakaverit-${{ inputs.environment }} \
+            --query properties.outputs.functionAppName.value \
+            --output tsv)"
+          echo "resource_group_name=$resource_group_name" >> "$GITHUB_OUTPUT"
+          echo "function_app_name=$function_app_name" >> "$GITHUB_OUTPUT"
+      - run: |
+          az functionapp deployment source config-zip \
+            --resource-group "${{ steps.infrastructure.outputs.resource_group_name }}" \
+            --name "${{ steps.infrastructure.outputs.function_app_name }}" \
+            --src api-package.zip

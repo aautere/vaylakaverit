@@ -9,6 +9,24 @@ Sweden Central and defines:
 - Azure Web PubSub Free tier for up to 20 live participant connections;
 - Key Vault, Application Insights, Log Analytics, and Functions backing storage.
 
+## Runtime topology
+
+The PWA and API use separate origins. Azure Storage Static Website serves only the PWA; it does
+not proxy `/api` requests to Azure Functions. The `deploy-web` workflow builds the PWA with the
+Function App's HTTPS origin in `VITE_API_ORIGIN`, while local Vite development continues to proxy
+relative `/api` requests to `127.0.0.1:7071`. The Function App allows the static website origin
+through its `WEB_ORIGIN` setting.
+
+Deploy the Function package with the `deploy-api` workflow before deploying the PWA with
+`deploy-web`. Both workflows derive the active environment's resource names from the infrastructure
+deployment outputs and use the GitHub environment's federated Azure identity; no API secrets are
+embedded in the browser build.
+
+Development uses the non-persistent preview store, guest identity, and polling transport so it
+does not require Apple credentials or data-plane access to Cosmos DB and Web PubSub. Production
+uses Cosmos DB, Apple authentication, and Web PubSub; configure its Apple settings through secure
+runtime configuration before deployment.
+
 ## Cost guardrails
 
 - The PWA is hosted by the Storage Static Website feature, with no separate Static Web Apps plan.

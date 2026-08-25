@@ -29,7 +29,6 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @vaylakaverit/web build
       - uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -41,7 +40,20 @@ jobs:
             --name vaylakaverit-${{ inputs.environment }} \
             --query properties.outputs.storageAccountName.value \
             --output tsv)"
+          function_app_name="$(az deployment sub show \
+            --name vaylakaverit-${{ inputs.environment }} \
+            --query properties.outputs.functionAppName.value \
+            --output tsv)"
+          function_app_host_name="$(az functionapp show \
+            --resource-group rg-vaylakaverit \
+            --name "$function_app_name" \
+            --query properties.defaultHostName \
+            --output tsv)"
           echo "storage_account_name=$storage_account_name" >> "$GITHUB_OUTPUT"
+          echo "function_app_host_name=$function_app_host_name" >> "$GITHUB_OUTPUT"
+      - run: |
+          VITE_API_ORIGIN="https://${{ steps.infrastructure.outputs.function_app_host_name }}" \
+            pnpm --filter @vaylakaverit/web build
       - run: |
           az storage blob service-properties update \
             --auth-mode login \
