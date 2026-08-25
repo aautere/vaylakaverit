@@ -10,7 +10,7 @@ import { IdentityService } from './auth/identity.js';
 import { readLiveUpdateConfig } from './live-updates/config.js';
 import { createRoundUpdateTransport } from './live-updates/round-update-transport.js';
 import { createRoundStore } from './store/create-round-store.js';
-import { ScoreRevisionConflictError } from './store/round-store.js';
+import { ScoreRevisionConflictError, type FullRoundGameInput } from './store/round-store.js';
 
 const roundStore = createRoundStore();
 const identityService = new IdentityService(readAuthConfig(), new UnavailableAppleTokenVerifier());
@@ -54,6 +54,44 @@ async function requestBody(request: HttpRequest): Promise<Record<string, unknown
   return typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : {};
 }
 
+function parseFullRoundGames(value: unknown): FullRoundGameInput[] | undefined | null {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value) || value.length === 0) {
+    return null;
+  }
+
+  const games: FullRoundGameInput[] = [];
+  for (const valueItem of value) {
+    if (typeof valueItem !== 'object' || valueItem === null) {
+      return null;
+    }
+    const game = valueItem as Record<string, unknown>;
+    if (
+      (game.mode !== 'scratch' && game.mode !== 'handicap') ||
+      typeof game.reward !== 'string' ||
+      (game.holeTieRule !== undefined &&
+        game.holeTieRule !== 'no-winner' &&
+        game.holeTieRule !== 'carry-forward') ||
+      (game.endTieRule !== undefined &&
+        game.endTieRule !== 'draw' &&
+        game.endTieRule !== 'continue') ||
+      game.carryEligiblePlayerIds !== undefined
+    ) {
+      return null;
+    }
+
+    games.push({
+      mode: game.mode,
+      reward: game.reward.trim(),
+      holeTieRule: game.holeTieRule,
+      endTieRule: game.endTieRule,
+    });
+  }
+  return games;
+}
+
 app.http('apiOptions', {
   methods: ['OPTIONS'],
   authLevel: 'anonymous',
@@ -68,49 +106,56 @@ app.http('apiOptions', {
   }),
 });
 
+export async function createPreviewRoundHandler(request: HttpRequest): Promise<HttpResponseInit> {
+  const session = identityService.sessionFromRequest(request);
+  if (!session) {
+    return json({ error: 'Tunnistautuminen vaaditaan.' }, 401);
+  }
+
+  const body = await requestBody(request);
+  const name = typeof body.name === 'string' ? body.name : '';
+  const handicapIndex = typeof body.handicapIndex === 'number' ? body.handicapIndex : 18;
+  const teeLabel = typeof body.teeLabel === 'string' ? body.teeLabel : undefined;
+  const ratingTable = typeof body.ratingTable === 'string' ? body.ratingTable : undefined;
+  const mode = body.mode === 'handicap' ? 'handicap' : 'scratch';
+  const reward = typeof body.reward === 'string' ? body.reward : '';
+  const holeTieRule = body.holeTieRule === 'carry-forward' ? 'carry-forward' : 'no-winner';
+  const endTieRule = body.endTieRule === 'continue' ? 'continue' : 'draw';
+  const games = parseFullRoundGames(body.games);
+
+  if (!name.trim()) {
+    return json({ error: 'Anna pelaajan nimi.' }, 400);
+  }
+  if (games === null) {
+    return json({ error: 'Tarkista pelin asetukset.' }, 400);
+  }
+
+  try {
+    return json(
+      await roundStore.create({
+        identityId: session.subject,
+        name: name.trim(),
+        handicapIndex,
+        teeLabel,
+        ratingTable,
+        mode,
+        reward: reward.trim(),
+        holeTieRule,
+        endTieRule,
+        games,
+      }),
+      201,
+    );
+  } catch (error) {
+    return json({ error: handicapErrorMessage(error) }, 400);
+  }
+}
+
 app.http('createPreviewRound', {
   methods: ['POST'],
   authLevel: 'anonymous',
   route: 'preview/rounds',
-  handler: async (request) => {
-    const session = identityService.sessionFromRequest(request);
-    if (!session) {
-      return json({ error: 'Tunnistautuminen vaaditaan.' }, 401);
-    }
-
-    const body = await requestBody(request);
-    const name = typeof body.name === 'string' ? body.name : '';
-    const handicapIndex = typeof body.handicapIndex === 'number' ? body.handicapIndex : 18;
-    const teeLabel = typeof body.teeLabel === 'string' ? body.teeLabel : undefined;
-    const ratingTable = typeof body.ratingTable === 'string' ? body.ratingTable : undefined;
-    const mode = body.mode === 'handicap' ? 'handicap' : 'scratch';
-    const reward = typeof body.reward === 'string' ? body.reward : '';
-    const holeTieRule = body.holeTieRule === 'carry-forward' ? 'carry-forward' : 'no-winner';
-    const endTieRule = body.endTieRule === 'continue' ? 'continue' : 'draw';
-
-    if (!name.trim()) {
-      return json({ error: 'Anna pelaajan nimi.' }, 400);
-    }
-
-    try {
-      return json(
-        await roundStore.create({
-          identityId: session.subject,
-          name: name.trim(),
-          handicapIndex,
-          teeLabel,
-          ratingTable,
-          mode,
-          reward: reward.trim(),
-          holeTieRule,
-          endTieRule,
-        }),
-        201,
-      );
-    } catch (error) {
-      return json({ error: handicapErrorMessage(error) }, 400);
-    }
-  },
+  handler: createPreviewRoundHandler,
 });
 
 app.http('getPreviewRound', {

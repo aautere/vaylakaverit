@@ -2,6 +2,7 @@ import type { HttpRequest } from '@azure/functions';
 import { describe, expect, it } from 'vitest';
 import {
   completePreviewRoundHandler,
+  createPreviewRoundHandler,
   deleteAccountHandler,
   getPreviewInvitationHandler,
   getPreviewRoundHandler,
@@ -56,6 +57,13 @@ function startRequestFor(roundId: string, guestId: string): HttpRequest {
   } as unknown as HttpRequest;
 }
 
+function createRoundRequest(body: Record<string, unknown>): HttpRequest {
+  return {
+    headers: new Headers({ 'x-preview-guest-id': 'multiple-games-creator' }),
+    json: async () => body,
+  } as unknown as HttpRequest;
+}
+
 function readyRound(roundId: string) {
   const round = previewRoundStore.get(roundId)!;
   for (const player of round.players) {
@@ -89,6 +97,63 @@ describe('completed round history API', () => {
       expect.arrayContaining([expect.objectContaining({ id: round.id })]),
     );
     expect(detail.jsonBody).toMatchObject({ id: round.id, courseName: 'Golf Talma Master' });
+  });
+
+  describe('round creation API', () => {
+    it('accepts multiple full-round game configurations', async () => {
+      const response = await createPreviewRoundHandler(
+        createRoundRequest({
+          name: 'Aino',
+          handicapIndex: 18,
+          games: [
+            { mode: 'scratch', reward: 'Kahvit', holeTieRule: 'no-winner', endTieRule: 'draw' },
+            {
+              mode: 'handicap',
+              reward: 'Lounas',
+              holeTieRule: 'no-winner',
+              endTieRule: 'continue',
+            },
+          ],
+        }),
+      );
+
+      expect(response.status).toBe(201);
+      expect(response.jsonBody).toMatchObject({
+        games: [
+          { mode: 'scratch', reward: 'Kahvit', startHole: 1, holeCount: 18 },
+          { mode: 'handicap', reward: 'Lounas', startHole: 1, holeCount: 18 },
+        ],
+      });
+    });
+
+    it('rejects an empty full-round game collection', async () => {
+      const response = await createPreviewRoundHandler(
+        createRoundRequest({ name: 'Aino', handicapIndex: 18, games: [] }),
+      );
+
+      expect(response.status).toBe(400);
+      expect(response.jsonBody).toEqual({ error: 'Tarkista pelin asetukset.' });
+    });
+
+    it('rejects a carry-forward player selection before the round roster exists', async () => {
+      const response = await createPreviewRoundHandler(
+        createRoundRequest({
+          name: 'Aino',
+          handicapIndex: 18,
+          games: [
+            {
+              mode: 'scratch',
+              reward: '',
+              holeTieRule: 'carry-forward',
+              carryEligiblePlayerIds: [],
+            },
+          ],
+        }),
+      );
+
+      expect(response.status).toBe(400);
+      expect(response.jsonBody).toEqual({ error: 'Tarkista pelin asetukset.' });
+    });
   });
 
   describe('account deletion authorization', () => {
