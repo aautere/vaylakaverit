@@ -2,18 +2,16 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import {
   allocateRelativeHandicapStrokes,
   evaluateMatchPlay,
-  isRatingTable,
-  isTeeLabel,
-  lookupTalmaMasterPlayingHandicap,
+  legacyTalmaMasterCourseSnapshot,
   netHoleScore,
-  talmaMaster,
+  playingHandicapForSnapshot,
+  selectCourseSnapshot,
   type EndTieRule,
   type HoleTieRule,
   type MatchPlayOutcome,
   type MatchPlaySettings,
   type MatchPlayStanding,
-  type RatingTable,
-  type TeeLabel,
+  type CourseSnapshot,
 } from '@vaylakaverit/domain';
 
 export type { EndTieRule, HoleTieRule };
@@ -23,8 +21,8 @@ export type RoundPlayer = {
   id: string;
   identityId?: string;
   name: string;
-  teeLabel: TeeLabel;
-  ratingTable: RatingTable;
+  teeLabel: string;
+  ratingTable: string;
   handicapIndex: number;
   playingHandicap: number;
   ready: boolean;
@@ -52,7 +50,12 @@ export type RoundState = 'lobby' | 'active';
 
 export type Round = {
   id: string;
+  courseId: string;
+  courseVersion: string;
+  layoutId: string;
+  roundLength: number;
   courseName: string;
+  courseSnapshot: CourseSnapshot;
   joinLink: string;
   invitationToken: string;
   invitationExpiresAt: string;
@@ -79,6 +82,10 @@ export type CreateRoundInput = {
   handicapIndex: number;
   teeLabel?: string;
   ratingTable?: string;
+  courseId?: string;
+  courseVersion?: string;
+  layoutId?: string;
+  roundLength?: number;
   mode: GameMode;
   reward: string;
   holeTieRule?: HoleTieRule;
@@ -165,12 +172,19 @@ export const invitationLifetimeMilliseconds = 24 * 60 * 60 * 1000;
 export function createRound(input: CreateRoundInput, now = new Date()): Round {
   const id = randomUUID();
   const invitationToken = randomBytes(32).toString('base64url');
+  const courseSnapshot = selectCourseSnapshot({
+    courseId: input.courseId,
+    courseVersion: input.courseVersion,
+    layoutId: input.layoutId,
+    roundLength: input.roundLength,
+  });
   const player = createPlayer(
     input.identityId,
     input.name,
     input.handicapIndex,
     input.teeLabel,
     input.ratingTable,
+    courseSnapshot,
   );
   const games = (
     input.games ?? [
@@ -185,7 +199,7 @@ export function createRound(input: CreateRoundInput, now = new Date()): Round {
   ).map((gameInput) =>
     createGame({
       startHole: 1,
-      holeCount: 18,
+      holeCount: courseSnapshot.roundLength,
       mode: gameInput.mode,
       reward: gameInput.reward,
       participantIds: [],
@@ -201,7 +215,12 @@ export function createRound(input: CreateRoundInput, now = new Date()): Round {
 
   const round: Round = {
     id,
-    courseName: talmaMaster.name,
+    courseId: courseSnapshot.courseId,
+    courseVersion: courseSnapshot.courseVersion,
+    layoutId: courseSnapshot.layoutId,
+    roundLength: courseSnapshot.roundLength,
+    courseName: courseSnapshot.courseName,
+    courseSnapshot,
     joinLink: `/?join=${invitationToken}`,
     invitationToken,
     invitationExpiresAt: new Date(now.getTime() + invitationLifetimeMilliseconds).toISOString(),
@@ -248,6 +267,7 @@ export function revokeInvitation(
 }
 
 export function joinRound(round: Round, input: JoinRoundInput): Round | undefined {
+  hydrateRound(round);
   if (
     round.state !== 'lobby' ||
     round.invitationToken !== input.invitationToken ||
@@ -266,6 +286,7 @@ export function joinRound(round: Round, input: JoinRoundInput): Round | undefine
       input.handicapIndex,
       input.teeLabel,
       input.ratingTable,
+      round.courseSnapshot,
     ),
   );
   recalculateGames(round);
@@ -273,6 +294,7 @@ export function joinRound(round: Round, input: JoinRoundInput): Round | undefine
 }
 
 export function updateRoundPlayer(round: Round, input: UpdateRoundPlayerInput): Round | undefined {
+  hydrateRound(round);
   if (round.state !== 'lobby') {
     return undefined;
   }
@@ -288,6 +310,7 @@ export function updateRoundPlayer(round: Round, input: UpdateRoundPlayerInput): 
     input.handicapIndex,
     input.teeLabel,
     input.ratingTable,
+    round.courseSnapshot,
   );
   Object.assign(player, {
     name: updatedPlayer.name,
@@ -301,6 +324,7 @@ export function updateRoundPlayer(round: Round, input: UpdateRoundPlayerInput): 
 }
 
 export function startRound(round: Round): Round | undefined {
+  hydrateRound(round);
   if (!isRoundReady(round)) {
     return undefined;
   }
@@ -314,11 +338,12 @@ export function startRound(round: Round): Round | undefined {
 }
 
 export function isRoundReady(round: Round): boolean {
+  hydrateRound(round);
   return (
     round.state === 'lobby' &&
     round.players.length >= 2 &&
     round.players.length <= 4 &&
-    round.players.every(hasValidRequiredSettings) &&
+    round.players.every((player) => hasValidRequiredSettings(round, player)) &&
     fullRoundGames(round).every((game) => isFullRoundGameValid(round, game))
   );
 }
@@ -328,6 +353,7 @@ export function scoreRound(
   input: ScoreRoundInput,
   processedChangeIds: Set<string>,
 ): Round | undefined {
+  hydrateRound(round);
   const playerExists = round.players.some((player) => player.id === input.playerId);
 
   if (
@@ -336,7 +362,7 @@ export function scoreRound(
     !Number.isInteger(input.holeNumber) ||
     !Number.isInteger(input.strokes) ||
     input.holeNumber < 1 ||
-    input.holeNumber > 18 ||
+    input.holeNumber > round.roundLength ||
     input.strokes < 1
   ) {
     return undefined;
@@ -371,15 +397,16 @@ export function scoreRound(
 }
 
 export function addSideGame(round: Round, input: AddSideGameInput): Round | undefined {
+  hydrateRound(round);
   const participantIds = input.playerIds ?? round.players.map((player) => player.id);
   if (
     round.state !== 'active' ||
     !Number.isInteger(input.startHole) ||
     !Number.isInteger(input.holeCount) ||
     input.startHole < 1 ||
-    input.startHole > 18 ||
+    input.startHole > round.roundLength ||
     input.holeCount < 1 ||
-    input.startHole + input.holeCount > 19 ||
+    input.startHole + input.holeCount > round.roundLength + 1 ||
     input.startHole !== nextUpcomingHole(round) ||
     !isGameSettingsValid(round, { ...input, playerIds: participantIds })
   ) {
@@ -403,6 +430,7 @@ export function addSideGame(round: Round, input: AddSideGameInput): Round | unde
 }
 
 export function finishRound(round: Round, completedAt = new Date().toISOString()): CompletedRound {
+  hydrateRound(round);
   recalculateGames(round, true);
   const outcome = round.game.standings.outcome ?? fallbackOutcome(round.game.standings);
 
@@ -434,10 +462,12 @@ export function anonymizeIdentity(round: Round, identityId: string): boolean {
 }
 
 export function calculateStandings(round: Round): MatchPlayStanding {
+  hydrateRound(round);
   return calculateGameStanding(round, primaryFullRoundGame(round));
 }
 
 function recalculateGames(round: Round, roundFinished = false): void {
+  hydrateRound(round);
   const games = fullRoundGames(round);
   for (const game of games) {
     game.standings = calculateGameStanding(round, game, roundFinished);
@@ -467,7 +497,7 @@ function calculateGameStanding(
 
   return evaluateMatchPlay({
     playerIds: players.map((player) => player.id),
-    holes: talmaMaster.holes.map((hole) => ({
+    holes: round.courseSnapshot.holes.map((hole) => ({
       number: hole.number,
       scoresByPlayerId: Object.fromEntries(
         players.map((player) => [
@@ -478,6 +508,7 @@ function calculateGameStanding(
     })),
     startHole: game.startHole,
     holeCount: game.holeCount,
+    roundHoleCount: round.roundLength,
     settings: game,
     roundFinished,
   });
@@ -496,7 +527,7 @@ function scoreForGame(
     return undefined;
   }
   return mode === 'handicap'
-    ? netHoleScore(gross, allocations.get(playerId) ?? 0, handicapIndex)
+    ? netHoleScore(gross, allocations.get(playerId) ?? 0, handicapIndex, round.roundLength)
     : gross;
 }
 
@@ -547,7 +578,7 @@ function isGameSettingsValid(
 function isFullRoundGameValid(round: Round, game: Game): boolean {
   return (
     game.startHole === 1 &&
-    game.holeCount === 18 &&
+    game.holeCount === round.roundLength &&
     (game.mode === 'scratch' || game.mode === 'handicap') &&
     typeof game.reward === 'string' &&
     (game.holeTieRule === 'no-winner' || game.holeTieRule === 'carry-forward') &&
@@ -578,11 +609,12 @@ function gameParticipants(round: Round, game: Pick<Game, 'participantIds'>): Rou
 }
 
 export function nextUpcomingHole(round: Round): number | undefined {
+  hydrateRound(round);
   const scoredHoleNumbers = Object.values(round.scores).flatMap((scores) =>
     Object.keys(scores).map(Number),
   );
   const lastPlayedHole = Math.max(0, ...scoredHoleNumbers);
-  return lastPlayedHole < 18 ? lastPlayedHole + 1 : undefined;
+  return lastPlayedHole < round.roundLength ? lastPlayedHole + 1 : undefined;
 }
 
 export class ScoreRevisionConflictError extends Error {
@@ -592,25 +624,37 @@ export class ScoreRevisionConflictError extends Error {
   }
 }
 
-function hasValidRequiredSettings(player: RoundPlayer): boolean {
-  if (
-    !player.name.trim() ||
-    !Number.isFinite(player.handicapIndex) ||
-    !isTeeLabel(player.teeLabel) ||
-    !isRatingTable(player.ratingTable) ||
-    !player.ready
-  ) {
+function hasValidRequiredSettings(round: Round, player: RoundPlayer): boolean {
+  if (!player.name.trim() || !Number.isFinite(player.handicapIndex) || !player.ready) {
     return false;
   }
 
-  try {
-    return (
-      player.playingHandicap ===
-      lookupTalmaMasterPlayingHandicap(player.teeLabel, player.ratingTable, player.handicapIndex)
-    );
-  } catch {
-    return false;
+  return (
+    player.playingHandicap ===
+    playingHandicapForSnapshot(
+      round.courseSnapshot,
+      player.teeLabel,
+      player.ratingTable,
+      player.handicapIndex,
+    )
+  );
+}
+
+export function hydrateRound<TRound extends Round>(round: TRound): TRound {
+  if (round.courseSnapshot) {
+    return round;
   }
+
+  const courseSnapshot = structuredClone(legacyTalmaMasterCourseSnapshot);
+  Object.assign(round, {
+    courseId: courseSnapshot.courseId,
+    courseVersion: courseSnapshot.courseVersion,
+    layoutId: courseSnapshot.layoutId,
+    roundLength: courseSnapshot.roundLength,
+    courseName: courseSnapshot.courseName,
+    courseSnapshot,
+  });
+  return round;
 }
 
 function fallbackOutcome(standings: MatchPlayStanding): MatchPlayOutcome {
@@ -632,15 +676,10 @@ function createPlayer(
   identityId: string,
   name: string,
   handicapIndex: number,
-  teeLabel: string = talmaMaster.defaultTeeLabel,
+  teeLabel: string | undefined,
   ratingTable: string = 'men',
+  courseSnapshot: CourseSnapshot,
 ): RoundPlayer {
-  if (!isTeeLabel(teeLabel)) {
-    throw new Error('Valitse Golf Talma Masterin virallinen tii.');
-  }
-  if (!isRatingTable(ratingTable)) {
-    throw new Error('Valitse miesten tai naisten virallinen tasoitustaulukko.');
-  }
   if (!name.trim()) {
     throw new Error('Anna pelaajan nimi.');
   }
@@ -648,14 +687,31 @@ function createPlayer(
     throw new Error('Anna kelvollinen tasoitusindeksi.');
   }
 
+  const selectedTeeLabel = teeLabel ?? courseSnapshot.defaultTeeLabel;
+  const playingHandicap = playingHandicapForSnapshot(
+    courseSnapshot,
+    selectedTeeLabel,
+    ratingTable,
+    handicapIndex,
+  );
+  if (playingHandicap === undefined) {
+    if (!courseSnapshot.tees.some((tee) => tee.label === selectedTeeLabel)) {
+      throw new Error(`Valitse ${courseSnapshot.courseName}n virallinen tii.`);
+    }
+    if (!courseSnapshot.supportedRatingTables.includes(ratingTable as 'men' | 'women')) {
+      throw new Error('Valitse kentälle saatavilla oleva virallinen tasoitustaulukko.');
+    }
+    throw new Error('Tasoitusindeksille ei löydy valitun tiin virallista pelitasoitusta.');
+  }
+
   return {
     id: randomUUID(),
     identityId,
     name: name.trim(),
-    teeLabel,
+    teeLabel: selectedTeeLabel,
     ratingTable,
     handicapIndex,
-    playingHandicap: lookupTalmaMasterPlayingHandicap(teeLabel, ratingTable, handicapIndex),
+    playingHandicap,
     ready: false,
   };
 }

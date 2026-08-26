@@ -44,16 +44,27 @@ export function allocateRelativeHandicapStrokes(
   };
 }
 
-export function strokesOnHole(relativeStrokes: number, holeHandicapIndex: number): number {
+export function strokesOnHole(
+  relativeStrokes: number,
+  holeHandicapIndex: number,
+  roundHoleCount = 18,
+): number {
   if (!Number.isInteger(relativeStrokes) || relativeStrokes < 0) {
     throw new Error('Relative strokes must be a non-negative integer.');
   }
-  if (!Number.isInteger(holeHandicapIndex) || holeHandicapIndex < 1 || holeHandicapIndex > 18) {
-    throw new Error('Hole handicap index must be between 1 and 18.');
+  if (!Number.isInteger(roundHoleCount) || roundHoleCount < 1) {
+    throw new Error('Round hole count must be a positive integer.');
+  }
+  if (
+    !Number.isInteger(holeHandicapIndex) ||
+    holeHandicapIndex < 1 ||
+    holeHandicapIndex > roundHoleCount
+  ) {
+    throw new Error(`Hole handicap index must be between 1 and ${roundHoleCount}.`);
   }
 
-  const fullRounds = Math.floor(relativeStrokes / 18);
-  const remainingStrokes = relativeStrokes % 18;
+  const fullRounds = Math.floor(relativeStrokes / roundHoleCount);
+  const remainingStrokes = relativeStrokes % roundHoleCount;
 
   return fullRounds + (holeHandicapIndex <= remainingStrokes ? 1 : 0);
 }
@@ -62,10 +73,11 @@ export function netHoleScore(
   grossStrokes: number,
   relativeStrokes: number,
   holeHandicapIndex: number,
+  roundHoleCount = 18,
 ): number {
   if (!Number.isInteger(grossStrokes) || grossStrokes < 1) {
     throw new Error('Gross strokes must be a positive integer.');
   }
 
-  return grossStrokes - strokesOnHole(relativeStrokes, holeHandicapIndex);
+  return grossStrokes - strokesOnHole(relativeStrokes, holeHandicapIndex, roundHoleCount);
 }

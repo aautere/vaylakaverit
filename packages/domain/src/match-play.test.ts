@@ -92,6 +92,34 @@ describe('evaluateMatchPlay', () => {
     expect(unresolved).toMatchObject({ status: 'unresolved', outcome: { kind: 'unresolved' } });
   });
 
+  it('does not extend a completed nine-hole round beyond its configured range', () => {
+    const standing = evaluateMatchPlay({
+      playerIds: players,
+      holes: Array.from({ length: 9 }, (_, index) => ({
+        number: index + 1,
+        scoresByPlayerId: {
+          aino: 4,
+          elli: 4,
+        },
+      })),
+      startHole: 1,
+      holeCount: 8,
+      roundHoleCount: 9,
+      settings: {
+        holeTieRule: 'no-winner',
+        carryEligiblePlayerIds: players,
+        endTieRule: 'continue',
+      },
+      roundFinished: true,
+    });
+
+    expect(standing).toMatchObject({
+      status: 'unresolved',
+      completedHoles: 9,
+      outcome: { kind: 'unresolved' },
+    });
+  });
+
   it('awards a shared hole winner only when one of three players has the lowest score', () => {
     const standing = evaluateMatchPlay({
       playerIds: ['aino', 'elli', 'sanni'],

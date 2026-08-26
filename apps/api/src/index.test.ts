@@ -9,6 +9,7 @@ import {
   getRoundLiveConnectionHandler,
   getCompletedPreviewRoundHandler,
   joinPreviewRoundHandler,
+  listPreviewCoursesHandler,
   listCompletedPreviewRoundsHandler,
   recordPreviewScoreHandler,
   revokePreviewInvitationHandler,
@@ -57,12 +58,108 @@ function startRequestFor(roundId: string, guestId: string): HttpRequest {
   } as unknown as HttpRequest;
 }
 
-function createRoundRequest(body: Record<string, unknown>): HttpRequest {
+function createRoundRequest(body: Record<string, unknown>, guestId = 'create-round'): HttpRequest {
   return {
-    headers: new Headers({ 'x-preview-guest-id': 'multiple-games-creator' }),
+    params: {},
+    headers: new Headers({ 'x-preview-guest-id': guestId }),
     json: async () => body,
   } as unknown as HttpRequest;
 }
+
+describe('course selection API', () => {
+  it('lists only stable course configuration required by the selector', async () => {
+    const response = await listPreviewCoursesHandler(requestFor(''));
+
+    expect(response).toMatchObject({
+      status: 200,
+      jsonBody: expect.arrayContaining([
+        expect.objectContaining({
+          id: 'golf-talma-master',
+          version: '2017-06',
+          defaultTeeLabel: '52',
+          supportedRatingTables: ['men', 'women'],
+          layouts: [
+            expect.objectContaining({
+              id: '18-holes',
+              roundLength: 18,
+              tees: expect.any(Array),
+              holes: expect.arrayContaining([
+                expect.objectContaining({ number: 1, sourceHoleNumber: 1, pass: 1 }),
+              ]),
+            }),
+          ],
+        }),
+        expect.objectContaining({
+          id: 'rock-golf',
+          defaultTeeLabel: 'O',
+          supportedRatingTables: ['men'],
+          layouts: expect.arrayContaining([
+            expect.objectContaining({ id: '9-holes', roundLength: 9 }),
+            expect.objectContaining({ id: '18-holes', roundLength: 18 }),
+          ]),
+        }),
+      ]),
+    });
+  });
+
+  it('creates a Rock Golf nine-hole round with its immutable course context', async () => {
+    const response = await createPreviewRoundHandler(
+      createRoundRequest({
+        name: 'Aino',
+        handicapIndex: 18,
+        teeLabel: 'O',
+        ratingTable: 'men',
+        courseId: 'rock-golf',
+        courseVersion: '2026-08-26',
+        layoutId: '9-holes',
+        roundLength: 9,
+      }),
+    );
+
+    expect(response).toMatchObject({
+      status: 201,
+      jsonBody: {
+        courseId: 'rock-golf',
+        courseVersion: '2026-08-26',
+        layoutId: '9-holes',
+        roundLength: 9,
+        courseSnapshot: {
+          holes: expect.arrayContaining([expect.objectContaining({ number: 9, pass: 1 })]),
+        },
+      },
+    });
+  });
+
+  it('rejects unsupported Rock tables and stale course selections', async () => {
+    const unsupportedTable = await createPreviewRoundHandler(
+      createRoundRequest({
+        name: 'Aino',
+        handicapIndex: 18,
+        teeLabel: 'O',
+        ratingTable: 'women',
+        courseId: 'rock-golf',
+        layoutId: '9-holes',
+      }),
+      'unsupported-table',
+    );
+    const staleSelection = await createPreviewRoundHandler(
+      createRoundRequest({
+        name: 'Aino',
+        handicapIndex: 18,
+        courseId: 'rock-golf',
+        courseVersion: 'old',
+        layoutId: '9-holes',
+      }),
+      'stale-course',
+    );
+
+    expect(unsupportedTable).toMatchObject({
+      status: 400,
+      jsonBody: { error: 'Valitse kentälle saatavilla oleva virallinen tasoitustaulukko.' },
+    });
+    expect(staleSelection).toMatchObject({ status: 400 });
+  });
+});
 
 function readyRound(roundId: string) {
   const round = previewRoundStore.get(roundId)!;

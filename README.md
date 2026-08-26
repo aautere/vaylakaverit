@@ -82,14 +82,14 @@ nvm use 22
 pnpm e2e
 ```
 
-The test starts `pnpm preview` with Node 22 and uses two iPhone 13-sized Chromium contexts. It
-creates a round, follows the copied local join link, starts a side game, verifies a tied hole,
-corrects a score, and reviews completed history. The PWA manifest configures standalone display;
-installation itself still requires manual verification on physical iPhone Safari. Created rounds
-also display the opaque invitation URL as a QR code. The join screen can scan it with a supported
-mobile camera or accept a pasted link; the latter keeps local browser E2E independent of camera
-permissions. It uses preview storage, guest identities, and polling only; Azure credentials are
-not required. On a new machine, install the local Chromium binary once with
+The test starts `pnpm preview` with Node 22 and uses iPhone 13-sized Chromium contexts. It covers
+the Talma shared-round flow plus Rock Golf's 9-hole and two-pass 18-hole choices, dynamic tees,
+men's-only rating table, second-pass score correction, and completed history. The PWA manifest
+configures standalone display; installation itself still requires manual verification on physical
+iPhone Safari. Created rounds also display the opaque invitation URL as a QR code. The join screen
+can scan it with a supported mobile camera or accept a pasted link; the latter keeps local browser
+E2E independent of camera permissions. It uses preview storage, guest identities, and polling only;
+Azure credentials are not required. On a new machine, install the local Chromium binary once with
 `pnpm exec playwright install chromium`.
 
 ## Azure and production caveats

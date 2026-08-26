@@ -4,6 +4,7 @@ import {
   type HttpResponseInit,
   type InvocationContext,
 } from '@azure/functions';
+import { courseRegistry } from '@vaylakaverit/domain';
 import { UnavailableAppleTokenVerifier } from './auth/apple.js';
 import { readAuthConfig } from './auth/config.js';
 import { IdentityService } from './auth/identity.js';
@@ -106,6 +107,42 @@ app.http('apiOptions', {
   }),
 });
 
+app.http('listPreviewCourses', {
+  methods: ['GET'],
+  authLevel: 'anonymous',
+  route: 'preview/courses',
+  handler: listPreviewCoursesHandler,
+});
+
+export async function listPreviewCoursesHandler(_request: HttpRequest): Promise<HttpResponseInit> {
+  return json(
+    courseRegistry.map((course) => ({
+      id: course.id,
+      version: course.version,
+      name: course.name,
+      defaultTeeLabel: course.defaultTeeLabel,
+      supportedRatingTables: course.supportedRatingTables,
+      layouts: course.layouts.map((layout) => ({
+        id: layout.id,
+        roundLength: layout.roundLength,
+        tees: layout.tees,
+        holes: layout.holes.map(({ number, sourceHoleNumber, pass }) => ({
+          number,
+          sourceHoleNumber,
+          pass,
+        })),
+      })),
+    })),
+  );
+}
+
+app.http('createPreviewRound', {
+  methods: ['POST'],
+  authLevel: 'anonymous',
+  route: 'preview/rounds',
+  handler: createPreviewRoundHandler,
+});
+
 export async function createPreviewRoundHandler(request: HttpRequest): Promise<HttpResponseInit> {
   const session = identityService.sessionFromRequest(request);
   if (!session) {
@@ -117,6 +154,7 @@ export async function createPreviewRoundHandler(request: HttpRequest): Promise<H
   const handicapIndex = typeof body.handicapIndex === 'number' ? body.handicapIndex : 18;
   const teeLabel = typeof body.teeLabel === 'string' ? body.teeLabel : undefined;
   const ratingTable = typeof body.ratingTable === 'string' ? body.ratingTable : undefined;
+  const courseSelection = readCourseSelection(body);
   const mode = body.mode === 'handicap' ? 'handicap' : 'scratch';
   const reward = typeof body.reward === 'string' ? body.reward : '';
   const holeTieRule = body.holeTieRule === 'carry-forward' ? 'carry-forward' : 'no-winner';
@@ -125,6 +163,9 @@ export async function createPreviewRoundHandler(request: HttpRequest): Promise<H
 
   if (!name.trim()) {
     return json({ error: 'Anna pelaajan nimi.' }, 400);
+  }
+  if ('error' in courseSelection) {
+    return json({ error: courseSelection.error }, 400);
   }
   if (games === null) {
     return json({ error: 'Tarkista pelin asetukset.' }, 400);
@@ -138,6 +179,7 @@ export async function createPreviewRoundHandler(request: HttpRequest): Promise<H
         handicapIndex,
         teeLabel,
         ratingTable,
+        ...courseSelection,
         mode,
         reward: reward.trim(),
         holeTieRule,
@@ -150,13 +192,6 @@ export async function createPreviewRoundHandler(request: HttpRequest): Promise<H
     return json({ error: handicapErrorMessage(error) }, 400);
   }
 }
-
-app.http('createPreviewRound', {
-  methods: ['POST'],
-  authLevel: 'anonymous',
-  route: 'preview/rounds',
-  handler: createPreviewRoundHandler,
-});
 
 app.http('getPreviewRound', {
   methods: ['GET'],
@@ -650,6 +685,35 @@ function isRoundParticipant(
 
 function handicapErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Pelitasoitusta ei voitu määrittää.';
+}
+
+function readCourseSelection(body: Record<string, unknown>):
+  | {
+      courseId?: string;
+      courseVersion?: string;
+      layoutId?: string;
+      roundLength?: number;
+    }
+  | { error: string } {
+  const stringFields = ['courseId', 'courseVersion', 'layoutId'] as const;
+  for (const field of stringFields) {
+    if (field in body && typeof body[field] !== 'string') {
+      return { error: 'Valitse kelvollinen kenttä ja kierroksen pituus.' };
+    }
+  }
+  if (
+    'roundLength' in body &&
+    (typeof body.roundLength !== 'number' || !Number.isInteger(body.roundLength))
+  ) {
+    return { error: 'Valitse kelvollinen kenttä ja kierroksen pituus.' };
+  }
+
+  return {
+    courseId: body.courseId as string | undefined,
+    courseVersion: body.courseVersion as string | undefined,
+    layoutId: body.layoutId as string | undefined,
+    roundLength: body.roundLength as number | undefined,
+  };
 }
 
 async function publishRoundUpdate(roundId: string): Promise<void> {
