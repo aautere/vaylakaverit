@@ -15,6 +15,10 @@ workflow:
   - After writing each OpenSpec artifact, show it to the user for review before moving
     to the next artifact.
   - Do not begin implementation until the user has explicitly approved the task list.
+  - Once implementation has started after that approval, complete one ready unchecked task at a time.
+    After its required validation and commit-and-push completion, continue with the next ready
+    unchecked task without asking the user to continue. Stop when no task is ready, validation
+    blocks completion, or the approved scope needs to change.
   - Keep the user conversation in their language; keep repository artifacts in English.
 
 rules:
