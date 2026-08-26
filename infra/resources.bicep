@@ -149,7 +149,7 @@ resource functionAppSettings 'Microsoft.Web/sites/config@2024-04-01' = {
     COSMOS_ENDPOINT: cosmosAccount.properties.documentEndpoint
     COSMOS_DATABASE_ID: cosmosDatabase.name
     COSMOS_CONTAINER_ID: roundsContainer.name
-    ROUND_UPDATE_TRANSPORT: isProduction ? 'web-pubsub' : 'poll'
+    ROUND_UPDATE_TRANSPORT: 'web-pubsub'
     WEB_PUBSUB_ENDPOINT: 'https://${webPubSub.name}.webpubsub.azure.com'
     WEB_PUBSUB_HUB: 'rounds'
     WEB_ORIGIN: webOrigin
