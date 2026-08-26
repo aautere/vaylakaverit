@@ -74,7 +74,6 @@ grant the Function App's managed identity the required Storage data-plane roles:
   <resource-group> \
   <function-app-name> \
   <storage-account-name> \
-  <cosmos-account-name> \
   <application-insights-name> \
   <github-actions-client-id>
 ```
@@ -89,11 +88,9 @@ az deployment sub show \
 ```
 
 The script assigns `Storage Blob Data Owner`, `Storage Queue Data Contributor`, and `Storage Table
-Data Contributor` only to the created Function App identity on its backing Storage Account. It also
-assigns the built-in Cosmos DB Data Contributor role to that identity, allowing both published
-development and production APIs to persist rounds. The script grants the GitHub deployment identity
-`Storage Blob Data Contributor`, which is required by the `deploy-web` workflow to enable the static
-website and upload PWA files.
+Data Contributor` only to the created Function App identity on its backing Storage Account. The
+script grants the GitHub deployment identity `Storage Blob Data Contributor`, which is required by
+the `deploy-web` workflow to enable the static website and upload PWA files.
 
 The script additionally grants the Function App identity `Monitoring Metrics Publisher` on the
 Application Insights component. Application Insights has local authentication disabled, so without
@@ -133,9 +130,9 @@ exists, but `az cosmosdb sql role assignment create` mints a fresh assignment id
 does not detect an equivalent existing assignment, so the script checks for the Cosmos assignment
 before creating it rather than accumulating duplicates.
 
-Development runs the preview store and the polling transport, so it does not need these grants.
-Run the script before switching an environment to Cosmos DB or Web PubSub, and before the first
-production deployment.
+Published development uses Cosmos DB and polling, so it needs the Cosmos DB grant. Production also
+needs the Web PubSub grant. Run the script before the first published-development or production
+deployment.
 
 ## Local validation
 
@@ -154,9 +151,8 @@ Run the environment through this order and verify it afterwards:
 2. `scripts/azure-grant-function-storage-access.sh`, once per environment, by an Azure RBAC
    administrator. Skip this on later deployments; the assignments are idempotent but the deployment
    identity cannot create them.
-3. `scripts/azure-grant-function-data-access.sh`, by the same administrator, for any environment
-   that runs `ROUND_STORE=cosmos` or `ROUND_UPDATE_TRANSPORT=web-pubsub`. Development does not need
-   it; production does.
+3. `scripts/azure-grant-function-data-access.sh`, by the same administrator, for every published
+   environment that runs `ROUND_STORE=cosmos` or `ROUND_UPDATE_TRANSPORT=web-pubsub`.
 4. `deploy-api` for the environment.
 5. `deploy-web` for the environment.
 6. Verify the result:

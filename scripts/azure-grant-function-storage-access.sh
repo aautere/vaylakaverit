@@ -1,24 +1,22 @@
 #!/usr/bin/env bash
 
 # Assign the data-plane roles required by a Flex Consumption Function App that
-# uses its system-assigned identity for AzureWebJobsStorage, Application Insights
-# ingestion, and Cosmos DB round storage. This is separate from Bicep because the
-# GitHub deployment identity intentionally has Contributor, not User Access
-# Administrator or Owner.
+# uses its system-assigned identity for AzureWebJobsStorage and Application
+# Insights ingestion. This is separate from Bicep because the GitHub deployment
+# identity intentionally has Contributor, not User Access Administrator or Owner.
 
 set -euo pipefail
 
-if [ "$#" -ne 6 ]; then
-  echo "Usage: $0 <resource-group> <function-app-name> <storage-account-name> <cosmos-account-name> <application-insights-name> <github-actions-client-id>" >&2
+if [ "$#" -ne 5 ]; then
+  echo "Usage: $0 <resource-group> <function-app-name> <storage-account-name> <application-insights-name> <github-actions-client-id>" >&2
   exit 1
 fi
 
 resource_group="$1"
 function_app_name="$2"
 storage_account_name="$3"
-cosmos_account_name="$4"
-application_insights_name="$5"
-github_actions_client_id="$6"
+application_insights_name="$4"
+github_actions_client_id="$5"
 
 function_principal_id="$(
   az functionapp identity show \
@@ -66,14 +64,6 @@ az role assignment create \
   --assignee-principal-type ServicePrincipal \
   --role "Monitoring Metrics Publisher" \
   --scope "$application_insights_scope" \
-  --only-show-errors
-
-az cosmosdb sql role assignment create \
-  --account-name "$cosmos_account_name" \
-  --resource-group "$resource_group" \
-  --scope "/" \
-  --principal-id "$function_principal_id" \
-  --role-definition-id "00000000-0000-0000-0000-000000000002" \
   --only-show-errors
 
 az role assignment create \
