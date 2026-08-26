@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 
 # Assign the data-plane roles required by a Flex Consumption Function App that
-# uses its system-assigned identity for AzureWebJobsStorage and for
-# Application Insights ingestion. This is separate from Bicep because the
-# GitHub deployment identity intentionally has Contributor, not User Access
-# Administrator or Owner.
+# uses its system-assigned identity for AzureWebJobsStorage and Application
+# Insights ingestion. This is separate from Bicep because the GitHub deployment
+# identity intentionally has Contributor, not User Access Administrator or Owner.
 
 set -euo pipefail
 

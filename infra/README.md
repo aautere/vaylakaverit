@@ -35,10 +35,11 @@ pnpm's default symlinked store, and fails if unexpected symlinks remain. A symli
 deploys successfully but leaves the Node worker unable to resolve `@azure/functions`, so the host
 starts and reports healthy while indexing zero functions.
 
-Development uses the non-persistent preview store, guest identity, and polling transport so it
-does not require Apple credentials or data-plane access to Cosmos DB and Web PubSub. Production
-uses Cosmos DB, Apple authentication, and Web PubSub; configure its Apple settings through secure
-runtime configuration before deployment.
+Local preview uses an in-memory store, guest identity, and polling without Azure resources.
+Published development uses Cosmos DB, device-local pseudonymous guest identities, and polling so
+testers can create and join the same round from separate devices. Production uses Cosmos DB, Apple
+authentication, and Web PubSub; configure its Apple settings through secure runtime configuration
+before deployment.
 
 ## Cost guardrails
 
@@ -87,9 +88,9 @@ az deployment sub show \
 ```
 
 The script assigns `Storage Blob Data Owner`, `Storage Queue Data Contributor`, and `Storage Table
-Data Contributor` only to the created Function App identity on its backing Storage Account. It also
-grants the GitHub deployment identity `Storage Blob Data Contributor`, which is required by the
-`deploy-web` workflow to enable the static website and upload PWA files.
+Data Contributor` only to the created Function App identity on its backing Storage Account. The
+script grants the GitHub deployment identity `Storage Blob Data Contributor`, which is required by
+the `deploy-web` workflow to enable the static website and upload PWA files.
 
 The script additionally grants the Function App identity `Monitoring Metrics Publisher` on the
 Application Insights component. Application Insights has local authentication disabled, so without
@@ -129,9 +130,9 @@ exists, but `az cosmosdb sql role assignment create` mints a fresh assignment id
 does not detect an equivalent existing assignment, so the script checks for the Cosmos assignment
 before creating it rather than accumulating duplicates.
 
-Development runs the preview store and the polling transport, so it does not need these grants.
-Run the script before switching an environment to Cosmos DB or Web PubSub, and before the first
-production deployment.
+Published development uses Cosmos DB and polling, so it needs the Cosmos DB grant. Production also
+needs the Web PubSub grant. Run the script before the first published-development or production
+deployment.
 
 ## Local validation
 
@@ -150,9 +151,8 @@ Run the environment through this order and verify it afterwards:
 2. `scripts/azure-grant-function-storage-access.sh`, once per environment, by an Azure RBAC
    administrator. Skip this on later deployments; the assignments are idempotent but the deployment
    identity cannot create them.
-3. `scripts/azure-grant-function-data-access.sh`, by the same administrator, for any environment
-   that runs `ROUND_STORE=cosmos` or `ROUND_UPDATE_TRANSPORT=web-pubsub`. Development does not need
-   it; production does.
+3. `scripts/azure-grant-function-data-access.sh`, by the same administrator, for every published
+   environment that runs `ROUND_STORE=cosmos` or `ROUND_UPDATE_TRANSPORT=web-pubsub`.
 4. `deploy-api` for the environment.
 5. `deploy-web` for the environment.
 6. Verify the result:

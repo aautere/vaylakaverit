@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  PreviewRoundUpdateTransport,
+  PollingRoundUpdateTransport,
   WebPubSubRoundUpdateTransport,
   roundGroup,
 } from './round-update-transport.js';
 
 describe('round update transports', () => {
-  it('provides local polling without Azure credentials', async () => {
+  it('provides polling without Azure credentials', async () => {
     await expect(
-      new PreviewRoundUpdateTransport().createConnection('round-1', 'guest:aino'),
+      new PollingRoundUpdateTransport().createConnection('round-1', 'guest:aino'),
     ).resolves.toEqual({ kind: 'poll', pollIntervalMilliseconds: 1000 });
   });
 

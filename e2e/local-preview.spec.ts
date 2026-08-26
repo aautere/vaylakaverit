@@ -126,9 +126,54 @@ test('a creator can revoke a local invitation so its link no longer opens', asyn
     await expect(creator.getByText('Kutsulinkki on mitätöity.')).toBeVisible();
 
     await viewer.goto(joinLink);
-    await expect(viewer.getByRole('alert')).toContainText('Kutsulinkki ei ole voimassa');
+    await expect(viewer.getByRole('alert')).toContainText('Liittymislinkki ei ole enää voimassa');
   } finally {
     await creatorContext.close();
+    await viewerContext.close();
+  }
+});
+
+test('a guest receives clear offline and started-round joining recovery', async ({ browser }) => {
+  const creatorContext = await browser.newContext({
+    ...devices['iPhone 13'],
+    permissions: ['clipboard-read', 'clipboard-write'],
+  });
+  const joinerContext = await browser.newContext({ ...devices['iPhone 13'] });
+  const viewerContext = await browser.newContext({ ...devices['iPhone 13'] });
+  const creator = await creatorContext.newPage();
+  const joiner = await joinerContext.newPage();
+  const viewer = await viewerContext.newPage();
+
+  try {
+    await creator.goto('/');
+    await creator.locator('#player-name').fill('Aino');
+    await creator.getByRole('button', { name: 'Luo kierros' }).click();
+    await creator.getByRole('button', { name: 'Kopioi liittymislinkki' }).click();
+    const joinLink = await creator.evaluate(() => navigator.clipboard.readText());
+
+    await joiner.goto('/');
+    await joiner.getByRole('button', { name: 'Liity kierrokseen' }).click();
+    await joiner.locator('#join-link').fill(joinLink);
+    await joiner.locator('#player-name').fill('Elli');
+    await joinerContext.setOffline(true);
+    await joiner.getByRole('button', { name: 'Liity kierrokseen' }).click();
+    await expect(joiner.getByRole('alert')).toContainText('Liittyminen vaatii verkkoyhteyden');
+    await joinerContext.setOffline(false);
+    await joiner.getByRole('button', { name: 'Liity kierrokseen' }).click();
+    await expect(joiner.getByRole('heading', { name: 'Kierroksen aula' })).toBeVisible();
+    await joiner.getByRole('button', { name: 'Vahvista asetukset valmiiksi' }).click();
+    await creator.getByRole('button', { name: 'Vahvista asetukset valmiiksi' }).click();
+    await creator.getByRole('button', { name: 'Aloita kierros' }).click();
+
+    await viewer.goto(joinLink);
+    await viewer.locator('#player-name').fill('Sanni');
+    await viewer.getByRole('button', { name: 'Liity kierrokseen' }).click();
+    await expect(viewer.getByRole('alert')).toContainText(
+      'Kierrokseen ei voi enää liittyä, koska se on aloitettu',
+    );
+  } finally {
+    await creatorContext.close();
+    await joinerContext.close();
     await viewerContext.close();
   }
 });

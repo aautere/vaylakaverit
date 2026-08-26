@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
 import { BrowserQRCodeReader } from '@zxing/browser';
 import { QRCodeSVG } from 'qrcode.react';
 import {
@@ -140,6 +140,30 @@ function scoreRequestCanBeQueued(error: unknown): boolean {
   return !(error instanceof ApiRequestError) || error.status >= 500;
 }
 
+function unavailableInvitationMessage(): string {
+  return 'Liittymislinkki ei ole enää voimassa. Pyydä kierroksen luojalta uusi linkki.';
+}
+
+function offlineInvitationMessage(): string {
+  return 'Liittyminen vaatii verkkoyhteyden. Yhdistä verkkoon ja yritä uudelleen.';
+}
+
+function invitationRequestErrorMessage(error: unknown): string {
+  if (error instanceof ApiRequestError) {
+    if (error.status === 404) {
+      return unavailableInvitationMessage();
+    }
+
+    if (error.status === 400 || error.status === 409) {
+      return 'Kierrokseen ei voi enää liittyä, koska se on aloitettu tai ryhmä on täynnä.';
+    }
+  }
+
+  return navigator.onLine === false
+    ? offlineInvitationMessage()
+    : 'Kutsulinkkiä ei voitu avata. Yritä uudelleen.';
+}
+
 function CameraQrScanner({
   onScan,
   onStatus,
@@ -256,12 +280,15 @@ function App() {
   const [scanning, setScanning] = useState(false);
   const [scannerStatus, setScannerStatus] = useState<string | null>(null);
   const [creatingRound, setCreatingRound] = useState(false);
+  const [invitationLoading, setInvitationLoading] = useState(false);
+  const [joining, setJoining] = useState(false);
   const [liveConnectionState, setLiveConnectionState] = useState<
     'connecting' | 'live' | 'polling' | 'reconnecting'
   >('connecting');
   const replayInProgress = useRef(false);
   const startGameHeadingRefs = useRef(new Map<string, HTMLHeadingElement>());
   const addStartGameRef = useRef<HTMLButtonElement>(null);
+  const lobbyHeadingRef = useRef<HTMLHeadingElement>(null);
 
   const joinUrl = round ? new URL(round.joinLink, window.location.origin).toString() : '';
   const canShareInvitation = round ? isInvitationValid(round) : false;
@@ -291,19 +318,27 @@ function App() {
     }
 
     let active = true;
+    setError(null);
+    if (navigator.onLine === false) {
+      setInvitationLoading(false);
+      setError(offlineInvitationMessage());
+      return undefined;
+    }
+
+    setInvitationLoading(true);
     void request<PreviewRound>(
       `/api/preview/invitations/${encodeURIComponent(joinInvitationToken)}`,
     )
       .then((invitedRound) => {
         if (active) {
           setInvitationRound(invitedRound);
+          setInvitationLoading(false);
         }
       })
       .catch((requestError: unknown) => {
         if (active) {
-          setError(
-            requestError instanceof Error ? requestError.message : 'Kutsulinkkiä ei voitu avata.',
-          );
+          setInvitationLoading(false);
+          setError(invitationRequestErrorMessage(requestError));
         }
       });
 
@@ -311,6 +346,12 @@ function App() {
       active = false;
     };
   }, [joinInvitationToken, round]);
+
+  useEffect(() => {
+    if (round?.state === 'lobby') {
+      lobbyHeadingRef.current?.focus();
+    }
+  }, [round?.id, round?.state]);
 
   useEffect(() => {
     if (!round || !activePlayerId) {
@@ -550,6 +591,12 @@ function App() {
       return;
     }
 
+    if (navigator.onLine === false) {
+      setError(offlineInvitationMessage());
+      return;
+    }
+
+    setJoining(true);
     try {
       const joinedRound = await request<PreviewRound>(
         `/api/preview/invitations/${encodeURIComponent(invitationToken)}/join`,
@@ -563,14 +610,15 @@ function App() {
       setRound(joinedRound);
       setInvitationRound(null);
       setCopied(false);
+      setNotice('Liityit kierrokseen. Vahvista seuraavaksi omat asetuksesi.');
       setActivePlayerId(
         joinedRound.players.find((player) => player.identityId === `guest:${previewGuestId()}`)
           ?.id ?? null,
       );
     } catch (requestError) {
-      setError(
-        requestError instanceof Error ? requestError.message : 'Kierrokseen ei voitu liittyä.',
-      );
+      setError(invitationRequestErrorMessage(requestError));
+    } finally {
+      setJoining(false);
     }
   }
 
@@ -868,7 +916,10 @@ function App() {
         <CompletedRoundHistory round={completedRound} onBack={() => setCompletedRound(null)} />
       ) : !round ? (
         <>
-          <section className="mt-10 rounded-3xl bg-[#073b2d] p-6 text-white shadow-lg shadow-[#073b2d]/15">
+          <section
+            aria-busy={invitationLoading || joining}
+            className="mt-10 rounded-3xl bg-[#073b2d] p-6 text-white shadow-lg shadow-[#073b2d]/15"
+          >
             <p className="text-sm font-semibold text-[#d4e5d9]">
               {joinInvitationToken || manualJoin ? 'LIITY KIERROKSEEN' : 'LUO UUSI KIERROS'}
             </p>
@@ -880,6 +931,11 @@ function App() {
             <p className="mt-3 text-base leading-7 text-[#d4e5d9]">
               Golf Talma Master, tii 52 ja pelaajat samalle kierrokselle liittymislinkillä.
             </p>
+            {invitationLoading ? (
+              <p role="status" className="mt-4 text-sm font-semibold text-[#d4e5d9]">
+                Avataan kierrosta…
+              </p>
+            ) : null}
             {invitationRound ? (
               <div className="mt-4 rounded-xl bg-white/10 px-4 py-3 text-sm text-[#d4e5d9]">
                 <p className="font-semibold text-white">{invitationRound.courseName}</p>
@@ -1110,13 +1166,15 @@ function App() {
               <button
                 type="submit"
                 className="min-h-12 rounded-xl bg-[#e5b700] px-4 py-3 font-bold text-[#17231c]"
-                disabled={creatingRound}
+                disabled={creatingRound || invitationLoading || joining}
               >
-                {joinInvitationToken || manualJoin
-                  ? 'Liity kierrokseen'
-                  : creatingRound
-                    ? 'Luodaan kierrosta ja pelejä…'
-                    : 'Luo kierros'}
+                {joining
+                  ? 'Liitytään kierrokseen…'
+                  : joinInvitationToken || manualJoin
+                    ? 'Liity kierrokseen'
+                    : creatingRound
+                      ? 'Luodaan kierrosta ja pelejä…'
+                      : 'Luo kierros'}
               </button>
               {!joinInvitationToken ? (
                 <button
@@ -1160,6 +1218,7 @@ function App() {
         <RoundLobby
           round={round}
           activePlayerId={activePlayerId}
+          headingRef={lobbyHeadingRef}
           copied={copied}
           onCopyJoinLink={copyJoinLink}
           canShareInvitation={canShareInvitation}
@@ -1561,6 +1620,7 @@ function PublicRoundView({ round }: { round: PreviewRound }) {
 function RoundLobby({
   round,
   activePlayerId,
+  headingRef,
   copied,
   onCopyJoinLink,
   canShareInvitation,
@@ -1570,6 +1630,7 @@ function RoundLobby({
 }: {
   round: PreviewRound;
   activePlayerId: string | null;
+  headingRef: RefObject<HTMLHeadingElement | null>;
   copied: boolean;
   onCopyJoinLink: () => Promise<void>;
   canShareInvitation: boolean;
@@ -1620,7 +1681,9 @@ function RoundLobby({
     <section className="mt-8 grid gap-5">
       <article className="rounded-3xl bg-[#073b2d] p-6 text-white shadow-lg shadow-[#073b2d]/15">
         <p className="text-sm font-semibold text-[#d4e5d9]">{round.courseName.toUpperCase()}</p>
-        <h2 className="mt-2 text-2xl font-bold">Vahvista ryhmä ennen aloitusta</h2>
+        <h2 ref={headingRef} tabIndex={-1} className="mt-2 text-2xl font-bold">
+          Vahvista ryhmä ennen aloitusta
+        </h2>
         <p className="mt-2 text-[#d4e5d9]">
           {round.players.length} / 4 pelaajaa ·{' '}
           {round.players.filter((player) => player.ready).length} valmiina
