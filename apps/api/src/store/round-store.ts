@@ -38,6 +38,14 @@ export type Game = MatchPlaySettings & {
   standings: MatchPlayStanding;
 };
 
+export type FullRoundGameInput = {
+  mode: GameMode;
+  reward: string;
+  holeTieRule?: HoleTieRule;
+  carryEligiblePlayerIds?: string[];
+  endTieRule?: EndTieRule;
+};
+
 export type RoundState = 'lobby' | 'active';
 
 export type Round = {
@@ -58,6 +66,7 @@ export type Round = {
   scores: Record<string, Record<number, number>>;
   scoreRevisions: Record<string, Record<number, number>>;
   game: Game;
+  games?: Game[];
   standings: MatchPlayStanding;
   sideGames: Game[];
 };
@@ -82,6 +91,7 @@ export type CreateRoundInput = {
   holeTieRule?: HoleTieRule;
   carryEligiblePlayerIds?: string[];
   endTieRule?: EndTieRule;
+  games?: FullRoundGameInput[];
 };
 
 export type JoinRoundInput = {
@@ -176,16 +186,32 @@ export function createRound(input: CreateRoundInput, now = new Date()): Round {
     input.ratingTable,
     courseSnapshot,
   );
-  const game = createGame({
-    startHole: 1,
-    holeCount: courseSnapshot.roundLength,
-    mode: input.mode,
-    reward: input.reward,
-    participantIds: [],
-    holeTieRule: input.holeTieRule ?? 'no-winner',
-    carryEligiblePlayerIds: input.carryEligiblePlayerIds ?? [player.id],
-    endTieRule: input.endTieRule ?? 'draw',
-  });
+  const games = (
+    input.games ?? [
+      {
+        mode: input.mode,
+        reward: input.reward,
+        holeTieRule: input.holeTieRule,
+        carryEligiblePlayerIds: input.carryEligiblePlayerIds,
+        endTieRule: input.endTieRule,
+      },
+    ]
+  ).map((gameInput) =>
+    createGame({
+      startHole: 1,
+      holeCount: courseSnapshot.roundLength,
+      mode: gameInput.mode,
+      reward: gameInput.reward,
+      participantIds: [],
+      holeTieRule: gameInput.holeTieRule ?? 'no-winner',
+      carryEligiblePlayerIds: gameInput.carryEligiblePlayerIds ?? [player.id],
+      endTieRule: gameInput.endTieRule ?? 'draw',
+    }),
+  );
+  const game = games[0];
+  if (!game) {
+    throw new Error('At least one full-round game is required.');
+  }
 
   const round: Round = {
     id,
@@ -204,6 +230,7 @@ export function createRound(input: CreateRoundInput, now = new Date()): Round {
     scores: {},
     scoreRevisions: {},
     game,
+    games,
     standings: game.standings,
     sideGames: [],
   };
@@ -302,7 +329,9 @@ export function startRound(round: Round): Round | undefined {
     return undefined;
   }
 
-  round.game.participantIds = round.players.map((player) => player.id);
+  for (const game of fullRoundGames(round)) {
+    game.participantIds = round.players.map((player) => player.id);
+  }
   round.state = 'active';
   recalculateGames(round);
   return round;
@@ -315,7 +344,7 @@ export function isRoundReady(round: Round): boolean {
     round.players.length >= 2 &&
     round.players.length <= 4 &&
     round.players.every((player) => hasValidRequiredSettings(round, player)) &&
-    isMainGameValid(round)
+    fullRoundGames(round).every((game) => isFullRoundGameValid(round, game))
   );
 }
 
@@ -434,12 +463,16 @@ export function anonymizeIdentity(round: Round, identityId: string): boolean {
 
 export function calculateStandings(round: Round): MatchPlayStanding {
   hydrateRound(round);
-  return calculateGameStanding(round, round.game);
+  return calculateGameStanding(round, primaryFullRoundGame(round));
 }
 
 function recalculateGames(round: Round, roundFinished = false): void {
   hydrateRound(round);
-  round.game.standings = calculateGameStanding(round, round.game, roundFinished);
+  const games = fullRoundGames(round);
+  for (const game of games) {
+    game.standings = calculateGameStanding(round, game, roundFinished);
+  }
+  round.game = games[0]!;
   round.standings = round.game.standings;
   for (const game of round.sideGames) {
     game.standings = calculateGameStanding(round, game, roundFinished);
@@ -542,9 +575,7 @@ function isGameSettingsValid(
   );
 }
 
-function isMainGameValid(round: Round): boolean {
-  hydrateRound(round);
-  const { game } = round;
+function isFullRoundGameValid(round: Round, game: Game): boolean {
   return (
     game.startHole === 1 &&
     game.holeCount === round.roundLength &&
@@ -554,6 +585,17 @@ function isMainGameValid(round: Round): boolean {
     (game.endTieRule === 'draw' || game.endTieRule === 'continue') &&
     isGameSettingsValid(round, game)
   );
+}
+
+function fullRoundGames(round: Round): Game[] {
+  if (!round.games || round.games.length === 0) {
+    round.games = [round.game];
+  }
+  return round.games;
+}
+
+function primaryFullRoundGame(round: Round): Game {
+  return fullRoundGames(round)[0]!;
 }
 
 function gameParticipants(round: Round, game: Pick<Game, 'participantIds'>): RoundPlayer[] {

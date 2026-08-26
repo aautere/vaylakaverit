@@ -92,6 +92,50 @@ describe('addPreviewSideGame', () => {
   });
 });
 
+describe('full-round games', () => {
+  it('calculates each configured game independently after the round starts', () => {
+    const round = previewRoundStore.create({
+      identityId: 'guest:multiple-aino',
+      name: 'Aino',
+      handicapIndex: 18,
+      mode: 'scratch',
+      reward: '',
+      games: [
+        { mode: 'scratch', reward: 'Kahvit' },
+        { mode: 'handicap', reward: 'Lounas', holeTieRule: 'carry-forward' },
+      ],
+    });
+    const elli = joinPreviewRound(round.id, 'Elli', 18, 'guest:multiple-elli')!.players[1]!;
+    readyRound(round.id);
+
+    recordPreviewScore(round.id, round.players[0]!.id, 1, 4);
+    const updatedRound = recordPreviewScore(round.id, elli.id, 1, 4);
+
+    expect(updatedRound?.games).toHaveLength(2);
+    expect(updatedRound?.games?.map((game) => game.mode)).toEqual(['scratch', 'handicap']);
+    expect(updatedRound?.games?.map((game) => game.participantIds)).toEqual([
+      [round.players[0]!.id, elli.id],
+      [round.players[0]!.id, elli.id],
+    ]);
+    expect(updatedRound?.games?.map((game) => game.standings.winsByPlayerId)).toEqual([
+      { [round.players[0]!.id]: 0, [elli.id]: 0 },
+      { [round.players[0]!.id]: 0, [elli.id]: 0 },
+    ]);
+    expect(updatedRound?.games?.map((game) => game.standings.carriedWins)).toEqual([0, 1]);
+  });
+
+  it('normalizes a legacy single-game round when the lobby is started', () => {
+    const round = createPreviewRound('Aino', 18, 'scratch', '', 'guest:legacy-aino');
+    delete round.games;
+    joinPreviewRound(round.id, 'Elli', 18, 'guest:legacy-elli');
+
+    const startedRound = readyRound(round.id);
+
+    expect(startedRound.games).toHaveLength(1);
+    expect(startedRound.games?.[0]).toMatchObject(startedRound.game);
+  });
+});
+
 describe('completePreviewRound', () => {
   it('moves the round to completed history with its scores, games, standings, and outcome', () => {
     const round = createPreviewRound('Aino', 18, 'scratch', 'Kahvit');

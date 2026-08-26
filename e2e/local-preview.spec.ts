@@ -34,8 +34,13 @@ test('two iPhone-sized participants join locally, settle a side-game tie, correc
     await creator.goto('/');
     await selectTalma(creator);
     await creator.locator('#player-name').fill('Aino');
+    await creator.getByRole('button', { name: 'Lisää peli' }).click();
+    await creator.getByRole('combobox', { name: 'Pelimuoto' }).nth(1).selectOption('handicap');
+    await creator.getByRole('textbox', { name: 'Palkinto (valinnainen)' }).nth(1).fill('Lounas');
     await creator.getByRole('button', { name: 'Luo kierros' }).click();
     await expect(creator.getByRole('heading', { name: 'Kierroksen aula' })).toBeVisible();
+    await expect(creator.getByRole('heading', { name: 'Pelien valmius' })).toBeVisible();
+    await expect(creator.getByText('Peli 2 · Tasoituksellinen reikäpeli')).toBeVisible();
 
     await creator.getByRole('button', { name: 'Kopioi liittymislinkki' }).click();
     await expect(creator.getByRole('button', { name: 'Liittymislinkki kopioitu' })).toBeVisible();
@@ -62,12 +67,12 @@ test('two iPhone-sized participants join locally, settle a side-game tie, correc
 
     await creator.locator('#strokes').fill('4');
     await creator.getByRole('button', { name: 'Tallenna tulos' }).click();
-    await expect(creator.getByText('0 reikää', { exact: true })).toBeVisible();
+    await expect(creator.getByText(/0 reikää/).first()).toBeVisible();
 
     await joiner.locator('#strokes').fill('4');
     await joiner.getByRole('button', { name: 'Tallenna tulos' }).click();
 
-    await expect(creator.getByText('1 reikää', { exact: true })).toBeVisible();
+    await expect(creator.getByText(/1 reikää/).first()).toBeVisible();
     await expect(creator.getByText('Reikä 1: tasatulos').first()).toBeVisible();
     await expect(creator.getByText('Tasapeli').last()).toBeVisible();
 
@@ -84,6 +89,8 @@ test('two iPhone-sized participants join locally, settle a side-game tie, correc
     await expect(creator.getByRole('heading', { name: 'Kierroksen historia' })).toBeVisible();
     await expect(creator.getByText('Kierros päättyi')).toBeVisible();
     await expect(creator.getByText('Palkinto: Kahvit')).toBeVisible();
+    await expect(creator.getByText('Peli 2').first()).toBeVisible();
+    await expect(creator.getByText('Palkinto: Lounas')).toBeVisible();
     await expect(creator.getByText('Reikä 1: 3 lyöntiä')).toBeVisible();
   } finally {
     await creatorContext.close();
@@ -126,7 +133,7 @@ test('a creator can revoke a local invitation so its link no longer opens', asyn
     await expect(creator.getByText('Kutsulinkki on mitätöity.')).toBeVisible();
 
     await viewer.goto(joinLink);
-    await expect(viewer.getByRole('alert')).toContainText('Kutsulinkki ei ole voimassa');
+    await expect(viewer.getByRole('alert')).toContainText('Liittymislinkki ei ole enää voimassa');
   } finally {
     await creatorContext.close();
     await viewerContext.close();
@@ -231,4 +238,50 @@ test('keyboard selection moves focus to Rock Golf length choices', async ({ page
   await rockRadio.focus();
   await page.keyboard.press('Space');
   await expect(page.getByText('Kierroksen pituus', { exact: true })).toBeFocused();
+});
+
+test('a guest receives clear offline and started-round joining recovery', async ({ browser }) => {
+  const creatorContext = await browser.newContext({
+    ...devices['iPhone 13'],
+    permissions: ['clipboard-read', 'clipboard-write'],
+  });
+  const joinerContext = await browser.newContext({ ...devices['iPhone 13'] });
+  const viewerContext = await browser.newContext({ ...devices['iPhone 13'] });
+  const creator = await creatorContext.newPage();
+  const joiner = await joinerContext.newPage();
+  const viewer = await viewerContext.newPage();
+
+  try {
+    await creator.goto('/');
+    await selectTalma(creator);
+    await creator.locator('#player-name').fill('Aino');
+    await creator.getByRole('button', { name: 'Luo kierros' }).click();
+    await creator.getByRole('button', { name: 'Kopioi liittymislinkki' }).click();
+    const joinLink = await creator.evaluate(() => navigator.clipboard.readText());
+
+    await joiner.goto('/');
+    await joiner.getByRole('button', { name: 'Liity kierrokseen' }).click();
+    await joiner.locator('#join-link').fill(joinLink);
+    await joiner.locator('#player-name').fill('Elli');
+    await joinerContext.setOffline(true);
+    await joiner.getByRole('button', { name: 'Liity kierrokseen' }).click();
+    await expect(joiner.getByRole('alert')).toContainText('Liittyminen vaatii verkkoyhteyden');
+    await joinerContext.setOffline(false);
+    await joiner.getByRole('button', { name: 'Liity kierrokseen' }).click();
+    await expect(joiner.getByRole('heading', { name: 'Kierroksen aula' })).toBeVisible();
+    await joiner.getByRole('button', { name: 'Vahvista asetukset valmiiksi' }).click();
+    await creator.getByRole('button', { name: 'Vahvista asetukset valmiiksi' }).click();
+    await creator.getByRole('button', { name: 'Aloita kierros' }).click();
+
+    await viewer.goto(joinLink);
+    await viewer.locator('#player-name').fill('Sanni');
+    await viewer.getByRole('button', { name: 'Liity kierrokseen' }).click();
+    await expect(viewer.getByRole('alert')).toContainText(
+      'Kierrokseen ei voi enää liittyä, koska se on aloitettu',
+    );
+  } finally {
+    await creatorContext.close();
+    await joinerContext.close();
+    await viewerContext.close();
+  }
 });

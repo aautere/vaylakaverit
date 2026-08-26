@@ -10,6 +10,10 @@ config="$repo_root/openspec/config.yaml"
 [ -x "$wrapper" ] || { echo "FAIL: wrapper is not executable"; exit 1; }
 [ -f "$template" ] || { echo "FAIL: proposal template is missing"; exit 1; }
 [ -f "$config" ] || { echo "FAIL: OpenSpec config is missing"; exit 1; }
+grep -q 'explicitly approved the task list' "$config" ||
+  { echo "FAIL: task-list approval gate is missing"; exit 1; }
+grep -q 'continue with the next ready' "$config" ||
+  { echo "FAIL: completed tasks do not advance automatically"; exit 1; }
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT

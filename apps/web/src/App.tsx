@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
 import { BrowserQRCodeReader } from '@zxing/browser';
 import { QRCodeSVG } from 'qrcode.react';
 import {
@@ -79,6 +79,7 @@ type PreviewRound = {
   scores: Record<string, Record<number, number>>;
   scoreRevisions: Record<string, Record<number, number>>;
   game: PreviewGame;
+  games?: PreviewGame[];
   standings: GameStanding;
   sideGames: PreviewGame[];
 };
@@ -155,6 +156,30 @@ function scoreRequestCanBeQueued(error: unknown): boolean {
   return !(error instanceof ApiRequestError) || error.status >= 500;
 }
 
+function unavailableInvitationMessage(): string {
+  return 'Liittymislinkki ei ole enää voimassa. Pyydä kierroksen luojalta uusi linkki.';
+}
+
+function offlineInvitationMessage(): string {
+  return 'Liittyminen vaatii verkkoyhteyden. Yhdistä verkkoon ja yritä uudelleen.';
+}
+
+function invitationRequestErrorMessage(error: unknown): string {
+  if (error instanceof ApiRequestError) {
+    if (error.status === 404) {
+      return unavailableInvitationMessage();
+    }
+
+    if (error.status === 400 || error.status === 409) {
+      return 'Kierrokseen ei voi enää liittyä, koska se on aloitettu tai ryhmä on täynnä.';
+    }
+  }
+
+  return navigator.onLine === false
+    ? offlineInvitationMessage()
+    : 'Kutsulinkkiä ei voitu avata. Yritä uudelleen.';
+}
+
 function CameraQrScanner({
   onScan,
   onStatus,
@@ -211,6 +236,28 @@ function CameraQrScanner({
   return <video ref={videoRef} className="mt-3 w-full rounded-xl bg-black" muted playsInline />;
 }
 
+type StartGameDraft = {
+  id: string;
+  mode: 'scratch' | 'handicap';
+  reward: string;
+  holeTieRule: 'no-winner' | 'carry-forward';
+  endTieRule: 'draw' | 'continue';
+};
+
+function createStartGameDraft(): StartGameDraft {
+  return {
+    id: crypto.randomUUID(),
+    mode: 'scratch',
+    reward: '',
+    holeTieRule: 'no-winner',
+    endTieRule: 'draw',
+  };
+}
+
+function fullRoundGames(round: Pick<PreviewRound, 'game' | 'games'>): PreviewGame[] {
+  return round.games && round.games.length > 0 ? round.games : [round.game];
+}
+
 function App() {
   const [joinInvitationToken, setJoinInvitationToken] = useState(() =>
     new URLSearchParams(window.location.search).get('join'),
@@ -234,12 +281,7 @@ function App() {
   const [courseSelectionNotice, setCourseSelectionNotice] = useState<string | null>(null);
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [selectedLayoutId, setSelectedLayoutId] = useState<string | null>(null);
-  const [gameMode, setGameMode] = useState<'scratch' | 'handicap'>('scratch');
-  const [gameHoleTieRule, setGameHoleTieRule] = useState<'no-winner' | 'carry-forward'>(
-    'no-winner',
-  );
-  const [gameEndTieRule, setGameEndTieRule] = useState<'draw' | 'continue'>('draw');
-  const [reward, setReward] = useState('');
+  const [startGames, setStartGames] = useState<StartGameDraft[]>(() => [createStartGameDraft()]);
   const [holeNumber, setHoleNumber] = useState(1);
   const [strokes, setStrokes] = useState(5);
   const [sideGameHoles, setSideGameHoles] = useState(3);
@@ -261,6 +303,9 @@ function App() {
   const [copied, setCopied] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [scannerStatus, setScannerStatus] = useState<string | null>(null);
+  const [creatingRound, setCreatingRound] = useState(false);
+  const [invitationLoading, setInvitationLoading] = useState(false);
+  const [joining, setJoining] = useState(false);
   const [liveConnectionState, setLiveConnectionState] = useState<
     'connecting' | 'live' | 'polling' | 'reconnecting'
   >('connecting');
@@ -268,6 +313,9 @@ function App() {
   const courseGroupRef = useRef<HTMLFieldSetElement>(null);
   const lengthLegendRef = useRef<HTMLLegendElement>(null);
   const courseKeyboardRef = useRef(false);
+  const startGameHeadingRefs = useRef(new Map<string, HTMLHeadingElement>());
+  const addStartGameRef = useRef<HTMLButtonElement>(null);
+  const lobbyHeadingRef = useRef<HTMLHeadingElement>(null);
 
   const joinUrl = round ? new URL(round.joinLink, window.location.origin).toString() : '';
   const canShareInvitation = round ? isInvitationValid(round) : false;
@@ -340,6 +388,14 @@ function App() {
     }
 
     let active = true;
+    setError(null);
+    if (navigator.onLine === false) {
+      setInvitationLoading(false);
+      setError(offlineInvitationMessage());
+      return undefined;
+    }
+
+    setInvitationLoading(true);
     void request<PreviewRound>(`/api/preview/invitations/${encodeURIComponent(invitationToken)}`)
       .then((invitedRound) => {
         if (active) {
@@ -362,13 +418,13 @@ function App() {
                 currentRatingTable,
               ).ratingTable,
           );
+          setInvitationLoading(false);
         }
       })
       .catch((requestError: unknown) => {
         if (active) {
-          setError(
-            requestError instanceof Error ? requestError.message : 'Kutsulinkkiä ei voitu avata.',
-          );
+          setInvitationLoading(false);
+          setError(invitationRequestErrorMessage(requestError));
         }
       });
 
@@ -376,6 +432,12 @@ function App() {
       active = false;
     };
   }, [joinInvitationToken, joinLink, manualJoin, round]);
+
+  useEffect(() => {
+    if (round?.state === 'lobby') {
+      lobbyHeadingRef.current?.focus();
+    }
+  }, [round?.id, round?.state]);
 
   useEffect(() => {
     if (!round || !activePlayerId) {
@@ -554,6 +616,11 @@ function App() {
     event.preventDefault();
     setError(null);
     setCourseSelectionIssue(null);
+    setNotice(null);
+    if (startGames.length === 0) {
+      setError('Valitse vähintään yksi peli.');
+      return;
+    }
 
     if (!selectedCourse) {
       setCourseSelectionIssue(courseSelectionCopy.missing);
@@ -565,6 +632,7 @@ function App() {
       return;
     }
     try {
+      setCreatingRound(true);
       const createdRound = await request<PreviewRound>('/api/preview/rounds', {
         name,
         handicapIndex,
@@ -574,15 +642,14 @@ function App() {
         courseVersion: selectedCourse.courseVersion,
         layoutId: selectedCourse.layoutId,
         roundLength: selectedCourse.roundLength,
-        mode: gameMode,
-        reward,
-        holeTieRule: gameHoleTieRule,
-        endTieRule: gameEndTieRule,
+        games: startGames.map(({ id: _id, ...game }) => game),
       });
       setRound(createdRound);
       setActivePlayerId(createdRound.players[0]?.id ?? null);
       setCopied(false);
-      setNotice(`Kierros luotiin: ${createdRound.courseName}, ${createdRound.roundLength} reikää.`);
+      setNotice(
+        `Kierros luotiin: ${createdRound.courseName}, ${createdRound.roundLength} reikää. Pelit luotiin.`,
+      );
     } catch (requestError) {
       if (
         requestError instanceof ApiRequestError &&
@@ -599,6 +666,8 @@ function App() {
         return;
       }
       setError(requestError instanceof Error ? requestError.message : 'Kierrosta ei voitu luoda.');
+    } finally {
+      setCreatingRound(false);
     }
   }
 
@@ -648,6 +717,31 @@ function App() {
     }
   }
 
+  function addStartGame() {
+    const game = createStartGameDraft();
+    setStartGames((games) => [...games, game]);
+    requestAnimationFrame(() => startGameHeadingRefs.current.get(game.id)?.focus());
+  }
+
+  function removeStartGame(gameId: string) {
+    const gameIndex = startGames.findIndex((game) => game.id === gameId);
+    const precedingGameId = startGames[gameIndex - 1]?.id;
+    setStartGames((games) => games.filter((game) => game.id !== gameId));
+    requestAnimationFrame(() => {
+      if (precedingGameId) {
+        startGameHeadingRefs.current.get(precedingGameId)?.focus();
+      } else {
+        addStartGameRef.current?.focus();
+      }
+    });
+  }
+
+  function updateStartGame(gameId: string, update: Partial<Omit<StartGameDraft, 'id'>>) {
+    setStartGames((games) =>
+      games.map((game) => (game.id === gameId ? { ...game, ...update } : game)),
+    );
+  }
+
   async function joinRound(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
@@ -659,6 +753,12 @@ function App() {
       return;
     }
 
+    if (navigator.onLine === false) {
+      setError(offlineInvitationMessage());
+      return;
+    }
+
+    setJoining(true);
     try {
       const joinedRound = await request<PreviewRound>(
         `/api/preview/invitations/${encodeURIComponent(invitationToken)}/join`,
@@ -672,14 +772,15 @@ function App() {
       setRound(joinedRound);
       setInvitationRound(null);
       setCopied(false);
+      setNotice('Liityit kierrokseen. Vahvista seuraavaksi omat asetuksesi.');
       setActivePlayerId(
         joinedRound.players.find((player) => player.identityId === `guest:${previewGuestId()}`)
           ?.id ?? null,
       );
     } catch (requestError) {
-      setError(
-        requestError instanceof Error ? requestError.message : 'Kierrokseen ei voitu liittyä.',
-      );
+      setError(invitationRequestErrorMessage(requestError));
+    } finally {
+      setJoining(false);
     }
   }
 
@@ -977,7 +1078,10 @@ function App() {
         <CompletedRoundHistory round={completedRound} onBack={() => setCompletedRound(null)} />
       ) : !round ? (
         <>
-          <section className="mt-10 rounded-3xl bg-[#073b2d] p-6 text-white shadow-lg shadow-[#073b2d]/15">
+          <section
+            aria-busy={invitationLoading || joining}
+            className="mt-10 rounded-3xl bg-[#073b2d] p-6 text-white shadow-lg shadow-[#073b2d]/15"
+          >
             <p className="text-sm font-semibold text-[#d4e5d9]">
               {joinInvitationToken || manualJoin ? 'LIITY KIERROKSEEN' : 'LUO UUSI KIERROS'}
             </p>
@@ -989,6 +1093,11 @@ function App() {
             <p className="mt-3 text-base leading-7 text-[#d4e5d9]">
               Valitse kenttä, kokoa ryhmä ja jaa liittymislinkki kavereille.
             </p>
+            {invitationLoading ? (
+              <p role="status" className="mt-4 text-sm font-semibold text-[#d4e5d9]">
+                Avataan kierrosta…
+              </p>
+            ) : null}
             {invitationRound ? (
               <div className="mt-4 rounded-xl bg-white/10 px-4 py-3 text-sm text-[#d4e5d9]">
                 <p className="font-semibold text-white">{invitationRound.courseName}</p>
@@ -1214,82 +1323,158 @@ function App() {
                 />
               </label>
               {!joinInvitationToken && !manualJoin ? (
-                <>
-                  <label className="grid gap-2 text-sm font-semibold" htmlFor="game-mode">
-                    Pelimuoto
-                    <select
-                      id="game-mode"
-                      className="min-h-12 rounded-xl bg-white px-3 text-base text-[#13251f]"
-                      value={gameMode}
-                      onChange={(event) =>
-                        setGameMode(event.target.value === 'handicap' ? 'handicap' : 'scratch')
-                      }
-                    >
-                      <option value="scratch">Scratch-reikäpeli</option>
-                      <option value="handicap">Tasoituksellinen reikäpeli</option>
-                    </select>
-                  </label>
-                  <label className="grid gap-2 text-sm font-semibold" htmlFor="reward">
-                    Palkinto (valinnainen)
-                    <input
-                      id="reward"
-                      className="min-h-12 rounded-xl bg-white px-3 text-base text-[#13251f]"
-                      value={reward}
-                      onChange={(event) => setReward(event.target.value)}
-                      placeholder="Esim. voittajalle olut"
-                    />
-                  </label>
-                  <label className="grid gap-2 text-sm font-semibold" htmlFor="game-hole-tie-rule">
-                    Tasatuloksen sääntö reiällä
-                    <select
-                      id="game-hole-tie-rule"
-                      className="min-h-12 rounded-xl bg-white px-3 text-base text-[#13251f]"
-                      value={gameHoleTieRule}
-                      onChange={(event) =>
-                        setGameHoleTieRule(
-                          event.target.value === 'carry-forward' ? 'carry-forward' : 'no-winner',
-                        )
-                      }
-                    >
-                      <option value="no-winner">Tasatuloksesta ei voittoa</option>
-                      <option value="carry-forward">Voitto siirtyy seuraavalle reiälle</option>
-                    </select>
-                  </label>
-                  {gameHoleTieRule === 'carry-forward' ? (
-                    <p className="text-sm text-[#d4e5d9]">
-                      Kierroksen luoja on valittu ratkaisemaan siirtyvän voiton.
+                <Card className="grid gap-3 bg-white/10 p-4 text-white">
+                  <div>
+                    <h3 className="text-lg font-bold">Pelit alusta</h3>
+                    <p className="mt-1 text-sm text-[#d4e5d9]">
+                      Voit pelata useaa peliä samanaikaisesti. Jokainen peli lasketaan erikseen.
                     </p>
-                  ) : null}
-                  <label className="grid gap-2 text-sm font-semibold" htmlFor="game-end-tie-rule">
-                    Tasatulos pelin lopussa
-                    <select
-                      id="game-end-tie-rule"
-                      className="min-h-12 rounded-xl bg-white px-3 text-base text-[#13251f]"
-                      value={gameEndTieRule}
-                      onChange={(event) =>
-                        setGameEndTieRule(event.target.value === 'continue' ? 'continue' : 'draw')
-                      }
+                  </div>
+                  {startGames.map((game, index) => (
+                    <section
+                      key={game.id}
+                      className="grid gap-3 rounded-xl bg-white/10 p-3"
+                      aria-labelledby={`start-game-${game.id}-heading`}
                     >
-                      <option value="draw">Merkitään tasapeliksi</option>
-                      <option value="continue">Jatketaan reikä kerrallaan</option>
-                    </select>
-                  </label>
-                </>
+                      <div className="flex items-center justify-between gap-3">
+                        <h4
+                          id={`start-game-${game.id}-heading`}
+                          ref={(heading) => {
+                            if (heading) {
+                              startGameHeadingRefs.current.set(game.id, heading);
+                            } else {
+                              startGameHeadingRefs.current.delete(game.id);
+                            }
+                          }}
+                          tabIndex={-1}
+                          className="font-bold"
+                        >
+                          Peli {index + 1}
+                        </h4>
+                        {index > 0 ? (
+                          <Action
+                            tone="secondary"
+                            className="text-sm"
+                            aria-label={`Poista peli ${index + 1}`}
+                            onClick={() => removeStartGame(game.id)}
+                          >
+                            Poista peli
+                          </Action>
+                        ) : null}
+                      </div>
+                      <label
+                        className="grid gap-2 text-sm font-semibold"
+                        htmlFor={`start-game-${game.id}-mode`}
+                      >
+                        Pelimuoto
+                        <select
+                          id={`start-game-${game.id}-mode`}
+                          className="min-h-12 rounded-xl bg-white px-3 text-base text-[#13251f]"
+                          value={game.mode}
+                          onChange={(event) =>
+                            updateStartGame(game.id, {
+                              mode: event.target.value === 'handicap' ? 'handicap' : 'scratch',
+                            })
+                          }
+                        >
+                          <option value="scratch">Scratch-reikäpeli</option>
+                          <option value="handicap">Tasoituksellinen reikäpeli</option>
+                        </select>
+                      </label>
+                      <label
+                        className="grid gap-2 text-sm font-semibold"
+                        htmlFor={`start-game-${game.id}-reward`}
+                      >
+                        Palkinto (valinnainen)
+                        <input
+                          id={`start-game-${game.id}-reward`}
+                          className="min-h-12 rounded-xl bg-white px-3 text-base text-[#13251f]"
+                          value={game.reward}
+                          onChange={(event) =>
+                            updateStartGame(game.id, { reward: event.target.value })
+                          }
+                          placeholder="Esim. voittajalle olut"
+                        />
+                      </label>
+                      <label
+                        className="grid gap-2 text-sm font-semibold"
+                        htmlFor={`start-game-${game.id}-hole-tie-rule`}
+                      >
+                        Tasatuloksen sääntö reiällä
+                        <select
+                          id={`start-game-${game.id}-hole-tie-rule`}
+                          className="min-h-12 rounded-xl bg-white px-3 text-base text-[#13251f]"
+                          value={game.holeTieRule}
+                          onChange={(event) =>
+                            updateStartGame(game.id, {
+                              holeTieRule:
+                                event.target.value === 'carry-forward'
+                                  ? 'carry-forward'
+                                  : 'no-winner',
+                            })
+                          }
+                        >
+                          <option value="no-winner">Tasatuloksesta ei voittoa</option>
+                          <option value="carry-forward">Voitto siirtyy seuraavalle reiälle</option>
+                        </select>
+                      </label>
+                      {game.holeTieRule === 'carry-forward' ? (
+                        <p className="text-sm text-[#d4e5d9]">
+                          Kierroksen luoja on valittu ratkaisemaan siirtyvän voiton.
+                        </p>
+                      ) : null}
+                      <label
+                        className="grid gap-2 text-sm font-semibold"
+                        htmlFor={`start-game-${game.id}-end-tie-rule`}
+                      >
+                        Tasatulos pelin lopussa
+                        <select
+                          id={`start-game-${game.id}-end-tie-rule`}
+                          className="min-h-12 rounded-xl bg-white px-3 text-base text-[#13251f]"
+                          value={game.endTieRule}
+                          onChange={(event) =>
+                            updateStartGame(game.id, {
+                              endTieRule: event.target.value === 'continue' ? 'continue' : 'draw',
+                            })
+                          }
+                        >
+                          <option value="draw">Merkitään tasapeliksi</option>
+                          <option value="continue">Jatketaan reikä kerrallaan</option>
+                        </select>
+                      </label>
+                    </section>
+                  ))}
+                  <Action ref={addStartGameRef} tone="secondary" onClick={addStartGame}>
+                    Lisää peli
+                  </Action>
+                </Card>
+              ) : null}
+              {creatingRound ? (
+                <StatusMessage tone="info">Luodaan kierrosta ja pelejä…</StatusMessage>
               ) : null}
               <button
                 type="submit"
                 className="min-h-12 rounded-xl bg-[#e5b700] px-4 py-3 font-bold text-[#17231c] disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={
-                  !joinInvitationToken &&
-                  !manualJoin &&
-                  (coursesLoading ||
-                    courseLoadError ||
-                    courses.length === 0 ||
-                    !selectedCourse ||
-                    !isOnline)
+                  creatingRound ||
+                  invitationLoading ||
+                  joining ||
+                  (!joinInvitationToken &&
+                    !manualJoin &&
+                    (coursesLoading ||
+                      courseLoadError ||
+                      courses.length === 0 ||
+                      !selectedCourse ||
+                      !isOnline))
                 }
               >
-                {joinInvitationToken || manualJoin ? 'Liity kierrokseen' : 'Luo kierros'}
+                {joining
+                  ? 'Liitytään kierrokseen…'
+                  : joinInvitationToken || manualJoin
+                    ? 'Liity kierrokseen'
+                    : creatingRound
+                      ? 'Luodaan kierrosta ja pelejä…'
+                      : 'Luo kierros'}
               </button>
               {!joinInvitationToken ? (
                 <button
@@ -1334,6 +1519,7 @@ function App() {
         <RoundLobby
           round={round}
           activePlayerId={activePlayerId}
+          headingRef={lobbyHeadingRef}
           copied={copied}
           onCopyJoinLink={copyJoinLink}
           canShareInvitation={canShareInvitation}
@@ -1345,17 +1531,20 @@ function App() {
         <section className="mt-8 grid gap-5">
           <article className="rounded-3xl bg-[#073b2d] p-6 text-white shadow-lg shadow-[#073b2d]/15">
             <p className="text-sm font-semibold text-[#d4e5d9]">{round.courseName.toUpperCase()}</p>
-            <h2 className="mt-2 text-2xl font-bold">Reikäpeli</h2>
+            <h2 className="mt-2 text-2xl font-bold">Reikäpelit</h2>
             <p className="mt-2 text-[#d4e5d9]">
               {selectedCourseSummary(round.courseName, round.roundLength)} ·{' '}
-              {gameModeName(round.game.mode)} · {round.players.length} / 4 pelaajaa
+              {fullRoundGames(round).length} peliä · {round.players.length} / 4 pelaajaa
             </p>
-            {round.game.reward ? (
-              <p className="mt-1 text-[#d4e5d9]">Palkinto: {round.game.reward}</p>
-            ) : null}
-            <p className="mt-1 text-sm text-[#d4e5d9]">
-              {gameSettingsName(round.game, round.players)} · {gameStatusName(round.game.standings)}
-            </p>
+            <ul className="mt-3 grid gap-2 text-sm text-[#d4e5d9]">
+              {fullRoundGames(round).map((game, index) => (
+                <li key={game.id ?? index} className="rounded-xl bg-white/10 px-3 py-2">
+                  <span className="font-semibold">Peli {index + 1}: </span>
+                  {gameModeName(game.mode)} · {gameStatusName(game.standings)}
+                  {game.reward ? ` · Palkinto: ${game.reward}` : ''}
+                </li>
+              ))}
+            </ul>
             <p className="mt-1 text-sm text-[#d4e5d9]">
               {liveConnectionStateName(liveConnectionState)}
             </p>
@@ -1426,30 +1615,21 @@ function App() {
 
           <article className="rounded-3xl border border-[#d8e2d8] bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-[#073b2d]">Pelitilanne</h2>
-              <span className="text-sm text-[#476257]">
-                {round.standings.completedHoles} reikää
-              </span>
+              <h2 className="text-xl font-bold text-[#073b2d]">Pelitilanteet</h2>
             </div>
-            <ul className="mt-3 grid gap-2">
-              {round.players
-                .toSorted(
-                  (left, right) =>
-                    (round.standings.winsByPlayerId[right.id] ?? 0) -
-                    (round.standings.winsByPlayerId[left.id] ?? 0),
-                )
-                .map((player) => (
-                  <li
-                    key={player.id}
-                    className="flex items-center justify-between rounded-xl bg-[#f1f5ef] px-3 py-3"
-                  >
-                    <span className="font-semibold">{player.name}</span>
-                    <span className="text-sm font-bold text-[#245642]">
-                      {round.standings.winsByPlayerId[player.id] ?? 0} voittoa
-                    </span>
-                  </li>
-                ))}
-            </ul>
+            <div className="mt-3 grid gap-3">
+              {fullRoundGames(round).map((game, index) => (
+                <section key={game.id ?? index} className="rounded-xl bg-[#f1f5ef] px-3 py-3">
+                  <h3 className="font-semibold">
+                    Peli {index + 1} · {gameModeName(game.mode)}
+                  </h3>
+                  <p className="mt-1 text-sm text-[#476257]">
+                    {game.standings.completedHoles} reikää · {gameStatusName(game.standings)}
+                  </p>
+                  <GameWins standing={game.standings} players={round.players} />
+                </section>
+              ))}
+            </div>
           </article>
 
           <form
@@ -1752,6 +1932,7 @@ function PublicRoundView({ round }: { round: PreviewRound }) {
 function RoundLobby({
   round,
   activePlayerId,
+  headingRef,
   copied,
   onCopyJoinLink,
   canShareInvitation,
@@ -1761,6 +1942,7 @@ function RoundLobby({
 }: {
   round: PreviewRound;
   activePlayerId: string | null;
+  headingRef: RefObject<HTMLHeadingElement | null>;
   copied: boolean;
   onCopyJoinLink: () => Promise<void>;
   canShareInvitation: boolean;
@@ -1811,7 +1993,9 @@ function RoundLobby({
     <section className="mt-8 grid gap-5">
       <article className="rounded-3xl bg-[#073b2d] p-6 text-white shadow-lg shadow-[#073b2d]/15">
         <p className="text-sm font-semibold text-[#d4e5d9]">{round.courseName.toUpperCase()}</p>
-        <h2 className="mt-2 text-2xl font-bold">Vahvista ryhmä ennen aloitusta</h2>
+        <h2 ref={headingRef} tabIndex={-1} className="mt-2 text-2xl font-bold">
+          Vahvista ryhmä ennen aloitusta
+        </h2>
         <p className="mt-2 text-[#d4e5d9]">
           {selectedCourseSummary(round.courseName, round.roundLength)} · {round.players.length} / 4
           pelaajaa · {round.players.filter((player) => player.ready).length} valmiina
@@ -1967,12 +2151,20 @@ function RoundLobby({
       ) : null}
 
       <article className="rounded-3xl border border-[#d8e2d8] bg-white p-5 shadow-sm">
-        <h2 className="text-xl font-bold text-[#073b2d]">Pelin valmius</h2>
-        <p className="mt-2 text-[#476257]">{gameModeName(round.game.mode)}</p>
-        <p className="mt-1 text-sm text-[#476257]">
-          {gameSettingsName(round.game, round.players)}
-          {round.game.reward ? ` · Palkinto: ${round.game.reward}` : ''}
-        </p>
+        <h2 className="text-xl font-bold text-[#073b2d]">Pelien valmius</h2>
+        <div className="mt-3 grid gap-2">
+          {fullRoundGames(round).map((game, index) => (
+            <section key={game.id ?? index} className="rounded-xl bg-[#f1f5ef] px-3 py-3">
+              <h3 className="font-semibold">
+                Peli {index + 1} · {gameModeName(game.mode)}
+              </h3>
+              <p className="mt-1 text-sm text-[#476257]">
+                {gameSettingsName(game, round.players)}
+                {game.reward ? ` · Palkinto: ${game.reward}` : ''}
+              </p>
+            </section>
+          ))}
+        </div>
         {isCreator ? (
           <>
             <p className="mt-4 text-sm text-[#476257]">
@@ -2006,12 +2198,6 @@ function CompletedRoundHistory({
   round: CompletedPreviewRound;
   onBack: () => void;
 }) {
-  const standings = [...round.players].toSorted(
-    (left, right) =>
-      (round.standings.winsByPlayerId[right.id] ?? 0) -
-      (round.standings.winsByPlayerId[left.id] ?? 0),
-  );
-
   return (
     <section className="mt-8 grid gap-5">
       <article className="rounded-3xl bg-[#073b2d] p-6 text-white shadow-lg shadow-[#073b2d]/15">
@@ -2051,18 +2237,22 @@ function CompletedRoundHistory({
 
       <article className="rounded-3xl border border-[#d8e2d8] bg-white p-5 shadow-sm">
         <h2 className="text-xl font-bold text-[#073b2d]">Peliasetukset</h2>
-        <div className="mt-3 rounded-xl bg-[#f1f5ef] px-3 py-3">
-          <h3 className="font-semibold">Pääpeli</h3>
-          <p className="mt-1 text-sm text-[#476257]">{gameModeName(round.game.mode)}</p>
-          <p className="mt-1 text-sm text-[#476257]">
-            {gameSettingsName(round.game, round.players)} · {gameStatusName(round.game.standings)}
-          </p>
-          <p className="mt-1 text-sm text-[#476257]">
-            Pelaajat: {participantNames(round.game, round.players)}
-          </p>
-          {round.game.reward ? (
-            <p className="mt-1 text-sm text-[#476257]">Palkinto: {round.game.reward}</p>
-          ) : null}
+        <div className="mt-3 grid gap-2">
+          {fullRoundGames(round).map((game, index) => (
+            <section key={game.id ?? index} className="rounded-xl bg-[#f1f5ef] px-3 py-3">
+              <h3 className="font-semibold">Peli {index + 1}</h3>
+              <p className="mt-1 text-sm text-[#476257]">{gameModeName(game.mode)}</p>
+              <p className="mt-1 text-sm text-[#476257]">
+                {gameSettingsName(game, round.players)} · {gameStatusName(game.standings)}
+              </p>
+              <p className="mt-1 text-sm text-[#476257]">
+                Pelaajat: {participantNames(game, round.players)}
+              </p>
+              {game.reward ? (
+                <p className="mt-1 text-sm text-[#476257]">Palkinto: {game.reward}</p>
+              ) : null}
+            </section>
+          ))}
         </div>
 
         <h3 className="mt-5 text-lg font-bold text-[#073b2d]">Sivupelit</h3>
@@ -2120,23 +2310,20 @@ function CompletedRoundHistory({
       </article>
 
       <article className="rounded-3xl border border-[#d8e2d8] bg-white p-5 shadow-sm">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-[#073b2d]">Lopputilanne</h2>
-          <span className="text-sm text-[#476257]">{round.standings.completedHoles} reikää</span>
-        </div>
-        <ul className="mt-3 grid gap-2">
-          {standings.map((player) => (
-            <li
-              key={player.id}
-              className="flex items-center justify-between rounded-xl bg-[#f1f5ef] px-3 py-3"
-            >
-              <span className="font-semibold">{player.name}</span>
-              <span className="text-sm font-bold text-[#245642]">
-                {round.standings.winsByPlayerId[player.id] ?? 0} voittoa
-              </span>
-            </li>
+        <h2 className="text-xl font-bold text-[#073b2d]">Lopputilanteet</h2>
+        <div className="mt-3 grid gap-3">
+          {fullRoundGames(round).map((game, index) => (
+            <section key={game.id ?? index} className="rounded-xl bg-[#f1f5ef] px-3 py-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold">Peli {index + 1}</h3>
+                <span className="text-sm text-[#476257]">
+                  {game.standings.completedHoles} reikää
+                </span>
+              </div>
+              <GameWins standing={game.standings} players={round.players} />
+            </section>
           ))}
-        </ul>
+        </div>
       </article>
 
       <article className="rounded-3xl border border-[#d8e2d8] bg-white p-5 shadow-sm">

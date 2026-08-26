@@ -6,7 +6,7 @@
   "main": "dist/*.js",
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.json",
-    "dev": "pnpm build && func start --port 7071",
+    "dev": "pnpm build && FUNCTIONS_WORKER_RUNTIME=node func start --port 7071",
     "lint": "pnpm --filter @vaylakaverit/domain build && tsc -p tsconfig.json --noEmit",
     "typecheck": "pnpm --filter @vaylakaverit/domain build && tsc -p tsconfig.json --noEmit",
     "test": "vitest run --dir src --passWithNoTests"

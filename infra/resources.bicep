@@ -13,6 +13,7 @@ var logAnalyticsName = '${namePrefix}-${environmentName}-logs-${suffix}'
 var applicationInsightsName = '${namePrefix}-${environmentName}-insights-${suffix}'
 var deploymentContainerName = 'function-package'
 var isProduction = environmentName == 'production'
+var webOrigin = join(take(split(storageAccount.properties.primaryEndpoints.web, '/'), 3), '/')
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageName
@@ -121,6 +122,12 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
     siteConfig: {
       alwaysOn: false
       minTlsVersion: '1.2'
+      cors: {
+        allowedOrigins: [
+          webOrigin
+        ]
+        supportCredentials: false
+      }
     }
   }
 }
@@ -136,15 +143,16 @@ resource functionAppSettings 'Microsoft.Web/sites/config@2024-04-01' = {
     AzureWebJobsStorage__tableServiceUri: storageAccount.properties.primaryEndpoints.table
     APPLICATIONINSIGHTS_CONNECTION_STRING: applicationInsights.properties.ConnectionString
     APPLICATIONINSIGHTS_AUTHENTICATION_STRING: 'Authorization=AAD'
-    AUTH_MODE: isProduction ? 'apple' : 'preview'
-    ROUND_STORE: isProduction ? 'cosmos' : 'preview'
+    APP_RUNTIME: isProduction ? 'production' : 'shared-development'
+    AUTH_MODE: isProduction ? 'apple' : 'guest'
+    ROUND_STORE: 'cosmos'
     COSMOS_ENDPOINT: cosmosAccount.properties.documentEndpoint
     COSMOS_DATABASE_ID: cosmosDatabase.name
     COSMOS_CONTAINER_ID: roundsContainer.name
-    ROUND_UPDATE_TRANSPORT: isProduction ? 'web-pubsub' : 'preview'
+    ROUND_UPDATE_TRANSPORT: 'web-pubsub'
     WEB_PUBSUB_ENDPOINT: 'https://${webPubSub.name}.webpubsub.azure.com'
     WEB_PUBSUB_HUB: 'rounds'
-    WEB_ORIGIN: join(take(split(storageAccount.properties.primaryEndpoints.web, '/'), 3), '/')
+    WEB_ORIGIN: webOrigin
   }
 }
 
@@ -232,4 +240,5 @@ output cosmosAccountName string = cosmosAccount.name
 output webPubSubName string = webPubSub.name
 output keyVaultName string = keyVault.name
 output storageAccountName string = storageAccount.name
+output applicationInsightsName string = applicationInsights.name
 output staticWebsiteEndpoint string = storageAccount.properties.primaryEndpoints.web

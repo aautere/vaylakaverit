@@ -10,6 +10,8 @@ implemented until its requirements, design, and delivery tasks have been agreed 
 3. Mark the proposal approved only after an explicit user approval in chat.
 4. Add the design, requirement deltas, and tasks.
 5. Build only after the task list has been approved.
+6. After implementation begins, complete the approved task list one ready task at a time, committing
+   and pushing each completed task before continuing automatically to the next.
 
 ## Setup
 
@@ -24,13 +26,13 @@ pnpm preview
 
 ## Useful commands
 
-| Command                       | Purpose                                        |
-| ----------------------------- | ---------------------------------------------- |
-| `pnpm spec:new <change-name>` | Create an OpenSpec change with a proposal      |
-| `pnpm spec:validate`          | Validate committed specs and in-flight changes |
-| `pnpm harness:test`           | Test the OpenSpec change wrapper               |
-| `pnpm format`                 | Format tracked project files                   |
-| `pnpm check`                  | Run all currently applicable quality gates     |
+| Command                       | Purpose                                            |
+| ----------------------------- | -------------------------------------------------- |
+| `pnpm spec:new <change-name>` | Create an OpenSpec change with a proposal          |
+| `pnpm spec:validate`          | Validate committed specs and in-flight changes     |
+| `pnpm harness:test`           | Test the OpenSpec change wrapper and Azure scripts |
+| `pnpm format`                 | Format tracked project files                       |
+| `pnpm check`                  | Run all currently applicable quality gates         |
 
 See `AGENTS.md` for the working rules and `openspec/config.yaml` for the specification workflow.
 
@@ -48,26 +50,28 @@ pnpm preview
 never installs Node. If it cannot find Node 22, run `nvm install 22 && nvm use 22` first.
 
 The web application is served at <http://127.0.0.1:5173> and the API at
-<http://127.0.0.1:7071>. The API defaults to `ROUND_STORE=preview`, so no Azure configuration is
-required locally. To use Cosmos DB in a deployed environment, set `ROUND_STORE=cosmos`,
-`COSMOS_ENDPOINT`, `COSMOS_DATABASE_ID`, and `COSMOS_CONTAINER_ID`. The API authenticates to
-Cosmos with `DefaultAzureCredential`; configure the Function App's managed identity with Cosmos
-data-plane access rather than a connection key.
+<http://127.0.0.1:7071>. The API defaults to `APP_RUNTIME=local-preview`, which uses an in-memory
+round store, so no Azure configuration is required locally. Published development uses
+`APP_RUNTIME=shared-development`: it stores rounds in Cosmos DB, keeps device-local guest
+identities, and polls for updates so separate devices can join the same test round. Production uses
+`APP_RUNTIME=production`, Cosmos DB, Apple authentication, and Web PubSub. The API authenticates to
+Cosmos with `DefaultAzureCredential`; grant the Function App's managed identity Cosmos data-plane
+access with `scripts/azure-grant-function-data-access.sh` rather than using a connection key.
 
-Local preview also defaults to `AUTH_MODE=preview`. It creates a device-local guest identity and
-does not need Apple or Azure credentials. A deployed Apple-authentication seam requires
-`AUTH_MODE=apple`, `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`, and a
-32-character-or-longer `SESSION_JWT_SECRET`, all supplied through secure runtime configuration.
-The current seam deliberately rejects Apple sign-in requests until a production Apple token
-verifier and real settings are supplied; it must not be presented as working Apple login.
+Local preview and published development use `AUTH_MODE=guest`, creating a device-local guest
+identity without Apple credentials. Production requires `AUTH_MODE=apple`, `APPLE_CLIENT_ID`,
+`APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`, and a 32-character-or-longer
+`SESSION_JWT_SECRET`, all supplied through secure runtime configuration. The current seam
+deliberately rejects Apple sign-in requests until a production Apple token verifier and real
+settings are supplied; it must not be presented as working Apple login.
 
-Preview also defaults to `ROUND_UPDATE_TRANSPORT=preview`. Joined browser sessions receive round
-updates by polling the authoritative snapshot once per second, without Azure credentials. Production
-uses `ROUND_UPDATE_TRANSPORT=web-pubsub`, `WEB_PUBSUB_ENDPOINT`, and `WEB_PUBSUB_HUB`; the Function
-App obtains Azure Web PubSub tokens and publishes only to `round:<round-id>` groups after verifying
-the caller is a participant. Assign the Function App managed identity the Azure Web PubSub service
-role required to generate client tokens and send group messages. Link-only viewers can still refresh
-the normal round snapshot but cannot obtain a live connection.
+Local preview and published development use `ROUND_UPDATE_TRANSPORT=poll`. Joined browser sessions
+receive round updates by polling the authoritative snapshot once per second. Production uses
+`ROUND_UPDATE_TRANSPORT=web-pubsub`, `WEB_PUBSUB_ENDPOINT`, and `WEB_PUBSUB_HUB`; the Function App
+obtains Azure Web PubSub tokens and publishes only to `round:<round-id>` groups after verifying the
+caller is a participant. `scripts/azure-grant-function-data-access.sh` assigns the Function App
+managed identity the `Web PubSub Service Owner` role those calls require. Link-only viewers can still
+refresh the normal round snapshot but cannot obtain a live connection.
 
 ### Browser E2E
 
@@ -95,6 +99,10 @@ Apple Sign In with production Apple credentials, Azure managed-identity permissi
 and Web PubSub, deployed PWA installation and updates on physical iPhone Safari, Azure monitoring
 and alerts, and GitHub branch protections/required checks. Never place Apple keys, session secrets,
 or Azure credentials in this repository.
+
+A deployment workflow reporting success does not prove an environment works. After deploying,
+run `./scripts/azure-verify-deployment.sh <environment>` to check the deployed environment against
+Azure. See `infra/README.md` for the deployment order and what the verification covers.
 
 ## License
 

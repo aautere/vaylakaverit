@@ -3,15 +3,16 @@ import { readAuthConfig } from './config.js';
 
 describe('authentication configuration', () => {
   it('defaults to local preview guests without Apple settings', () => {
-    expect(readAuthConfig({})).toEqual({ kind: 'preview' });
+    expect(readAuthConfig({})).toEqual({ kind: 'guest' });
   });
 
   it('requires all Apple and session settings when Apple authentication is enabled', () => {
-    expect(() => readAuthConfig({ AUTH_MODE: 'apple' })).toThrow(
+    expect(() => readAuthConfig({ APP_RUNTIME: 'production', AUTH_MODE: 'apple' })).toThrow(
       'APPLE_CLIENT_ID is required when AUTH_MODE is "apple".',
     );
     expect(() =>
       readAuthConfig({
+        APP_RUNTIME: 'production',
         AUTH_MODE: 'apple',
         APPLE_CLIENT_ID: 'com.example.golf',
         APPLE_TEAM_ID: 'ABCDEFGHIJ',
@@ -22,18 +23,19 @@ describe('authentication configuration', () => {
     ).toThrow('SESSION_JWT_SECRET must contain at least 32 characters.');
   });
 
-  it('does not allow a Cosmos-backed API to use preview guests', () => {
-    expect(() => readAuthConfig({ ROUND_STORE: 'cosmos' })).toThrow(
-      'APPLE_CLIENT_ID is required when AUTH_MODE is "apple".',
-    );
-    expect(() => readAuthConfig({ ROUND_STORE: 'cosmos', AUTH_MODE: 'preview' })).toThrow(
-      'AUTH_MODE "preview" is only available with ROUND_STORE "preview".',
+  it('allows guest identity only in local preview and shared development', () => {
+    expect(readAuthConfig({ APP_RUNTIME: 'shared-development', AUTH_MODE: 'guest' })).toEqual({
+      kind: 'guest',
+    });
+    expect(() => readAuthConfig({ APP_RUNTIME: 'production', AUTH_MODE: 'guest' })).toThrow(
+      'AUTH_MODE must be "apple" when APP_RUNTIME is "production".',
     );
   });
 
   it('accepts Apple settings supplied through runtime configuration', () => {
     expect(
       readAuthConfig({
+        APP_RUNTIME: 'production',
         AUTH_MODE: 'apple',
         APPLE_CLIENT_ID: 'com.example.golf',
         APPLE_TEAM_ID: 'ABCDEFGHIJ',

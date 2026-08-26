@@ -7,6 +7,7 @@ describe('Apple identity seam', () => {
   it('does not issue a session until a real Apple token verifier is supplied', async () => {
     const service = new IdentityService(
       readAuthConfig({
+        APP_RUNTIME: 'production',
         AUTH_MODE: 'apple',
         APPLE_CLIENT_ID: 'com.example.golf',
         APPLE_TEAM_ID: 'ABCDEFGHIJ',

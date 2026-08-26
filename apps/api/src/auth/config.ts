@@ -1,5 +1,7 @@
-export type PreviewAuthConfig = {
-  kind: 'preview';
+import { readRuntimeMode } from '../runtime-config.js';
+
+export type GuestAuthConfig = {
+  kind: 'guest';
 };
 
 export type AppleAuthConfig = {
@@ -11,22 +13,21 @@ export type AppleAuthConfig = {
   sessionSecret: string;
 };
 
-export type AuthConfig = PreviewAuthConfig | AppleAuthConfig;
+export type AuthConfig = GuestAuthConfig | AppleAuthConfig;
 
 export function readAuthConfig(environment: NodeJS.ProcessEnv = process.env): AuthConfig {
-  const kind =
-    environment.AUTH_MODE ?? (environment.ROUND_STORE === 'cosmos' ? 'apple' : 'preview');
+  const runtimeMode = readRuntimeMode(environment);
 
-  if (kind === 'preview') {
-    if (environment.ROUND_STORE === 'cosmos') {
-      throw new Error('AUTH_MODE "preview" is only available with ROUND_STORE "preview".');
+  if (runtimeMode !== 'production') {
+    if (environment.AUTH_MODE && environment.AUTH_MODE !== 'guest') {
+      throw new Error(`AUTH_MODE must be "guest" when APP_RUNTIME is "${runtimeMode}".`);
     }
 
-    return { kind };
+    return { kind: 'guest' };
   }
 
-  if (kind !== 'apple') {
-    throw new Error('AUTH_MODE must be either "preview" or "apple".');
+  if (environment.AUTH_MODE && environment.AUTH_MODE !== 'apple') {
+    throw new Error('AUTH_MODE must be "apple" when APP_RUNTIME is "production".');
   }
 
   const clientId = requiredSetting(environment, 'APPLE_CLIENT_ID');
@@ -39,7 +40,7 @@ export function readAuthConfig(environment: NodeJS.ProcessEnv = process.env): Au
     throw new Error('SESSION_JWT_SECRET must contain at least 32 characters.');
   }
 
-  return { kind, clientId, teamId, keyId, privateKey, sessionSecret };
+  return { kind: 'apple', clientId, teamId, keyId, privateKey, sessionSecret };
 }
 
 function requiredSetting(environment: NodeJS.ProcessEnv, name: string): string {
