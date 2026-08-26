@@ -20,6 +20,9 @@ workflow:
     unchecked task without asking the user to continue. Stop when no task is ready, validation
     blocks completion, or the approved scope needs to change.
   - Keep the user conversation in their language; keep repository artifacts in English.
+  - Explain progress to the user in plain language, leading with the effect on someone using the
+    application. Keep file names, commands, and other technical evidence in a separate section at
+    the end. See "Reporting results to the user" in AGENTS.md.
 
 rules:
   proposal:
