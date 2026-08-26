@@ -27,14 +27,17 @@ Small editorial fixes that do not alter user-visible behaviour may skip OpenSpec
 ## Execution boundaries
 
 - If the user names a task or task IDs, implement only that scope.
-- If the user requests implementation without naming a task, ask which approved task to start, or
-  propose the first ready task and wait for approval.
+- If the user requests implementation after the proposal and task list have both been explicitly
+  approved, start the first ready unchecked task when they do not name one.
 - Do not start more than one OpenSpec task at a time unless the user explicitly authorizes parallel
   work.
 - When delegating a task, do not overlap with the delegated scope. Do not begin another task while
   waiting unless the user explicitly approves parallel work.
 - Perform only the validation required to complete the active task.
-- After the active task is complete, report the result and wait for the user's next instruction.
+- After the active task has passed its required validation and has been committed and pushed, continue
+  to the next ready unchecked task in the approved task list without waiting for the user to say
+  “continue.” Stop when no task is ready, validation blocks completion, or the approved scope needs
+  to change.
 
 ## Completion protocol
 

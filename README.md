@@ -10,6 +10,8 @@ implemented until its requirements, design, and delivery tasks have been agreed 
 3. Mark the proposal approved only after an explicit user approval in chat.
 4. Add the design, requirement deltas, and tasks.
 5. Build only after the task list has been approved.
+6. After implementation begins, complete the approved task list one ready task at a time, committing
+   and pushing each completed task before continuing automatically to the next.
 
 ## Setup
 
