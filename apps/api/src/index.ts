@@ -511,10 +511,8 @@ export async function recordPreviewScoreHandler(request: HttpRequest): Promise<H
     return json({ error: 'Kierrosta ei löytynyt.' }, 404);
   }
 
-  if (
-    !round.players.some((player) => player.id === playerId && player.identityId === session.subject)
-  ) {
-    return json({ error: 'Voit tallentaa vain oman tuloksesi.' }, 403);
+  if (!isRoundParticipant(round, session.subject)) {
+    return json({ error: 'Vain kierrokselle liittynyt pelaaja voi tallentaa tuloksia.' }, 403);
   }
 
   let updatedRound;

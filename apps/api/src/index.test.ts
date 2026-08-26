@@ -378,21 +378,33 @@ describe('completed round history API', () => {
       expect(round.players).toHaveLength(1);
     });
 
-    it('prevents one participant from recording another participant’s score', async () => {
+    it('allows a participant to record and correct another participant’s score', async () => {
       const round = createPreviewRound('Aino', 18, 'scratch', '', 'guest:aino');
       const otherPlayer = joinPreviewRound(round.id, 'Elli', 18, 'guest:elli')!.players[1]!;
       readyRound(round.id);
 
-      const denied = await recordPreviewScoreHandler(
+      const recorded = await recordPreviewScoreHandler(
         scoreRequestFor(round.id, round.players[0]!.id, 'elli'),
       );
-      const accepted = await recordPreviewScoreHandler(
+      const corrected = await recordPreviewScoreHandler({
+        params: { roundId: round.id },
+        headers: new Headers({ 'x-preview-guest-id': 'elli' }),
+        json: async () => ({
+          playerId: round.players[0]!.id,
+          holeNumber: 1,
+          strokes: 5,
+          expectedRevision: 1,
+        }),
+      } as unknown as HttpRequest);
+      const ownScore = await recordPreviewScoreHandler(
         scoreRequestFor(round.id, otherPlayer.id, 'elli'),
       );
 
-      expect(denied.status).toBe(403);
-      expect(round.scores[round.players[0]!.id]).toBeUndefined();
-      expect(accepted.status).toBe(200);
+      expect(recorded.status).toBe(200);
+      expect(corrected.status).toBe(200);
+      expect(round.scores[round.players[0]!.id]?.[1]).toBe(5);
+      expect(round.scoreRevisions[round.players[0]!.id]?.[1]).toBe(2);
+      expect(ownScore.status).toBe(200);
       expect(round.scores[otherPlayer.id]?.[1]).toBe(4);
     });
 
