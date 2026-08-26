@@ -8,6 +8,31 @@ documentation in English.
 Describe product work in plain language. Do not assume a framework, data store, hosting platform, or
 authentication provider until the specification establishes a need for it.
 
+### Reporting results to the user
+
+The user owns the product; they are not reading the code. Explain what the work means for someone
+using the application, not what was done to the repository.
+
+- Lead with the user-visible effect: what a person can now do, what changed for them, or what would
+  otherwise have broken. Say so plainly when the honest answer is that nothing changes today.
+- State directly whether the application is safe to use now, and name what still does not work.
+- The first time an unavoidable technical name appears, introduce it with an everyday explanation,
+  such as "the database that stores rounds" before naming the service.
+- Do not put file paths, commands, environment variable names, role names, commit hashes, or command
+  output in the main explanation.
+- Put that evidence under a clearly separated "Technical details" heading at the end, so the user can
+  stop reading before it without missing anything they need.
+- Prefer short sentences and concrete outcomes. Never present a list of changed files, tasks, or
+  commits as the summary of the work.
+- Do not claim something works because it was implemented, merged, or deployed. Describe what was
+  actually observed, in everyday words.
+- When a previous answer turns out to have been wrong or outdated, correct it plainly instead of
+  quietly restating the new version.
+
+Terms such as data plane, managed identity, role assignment, transport, endpoint, idempotent, and
+deployment output carry no meaning for the user on their own. Translate them into everyday words, or
+move them into the technical section.
+
 ## Product-first workflow
 
 This repository is specification-driven. The application must not be implemented while its product
