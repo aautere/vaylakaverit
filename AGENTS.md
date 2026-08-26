@@ -95,6 +95,9 @@ If commit or push fails:
 - Preserve user data and make destructive actions explicit and reversible where practical.
 - Validate external input at the boundary and surface meaningful errors.
 - Add targeted tests for business rules, calculations, and non-trivial transformations.
+- Use the published shared development environment as the canonical end-to-end test surface. It MUST
+  provide production-equivalent behaviour for supported user flows, persistence, and integrations;
+  local preview alone is insufficient.
 - Keep secrets in local environment files only; never commit them.
 - Run the smallest relevant checks before saying work is ready.
 - After each validated, logical implementation slice, create and push a focused commit before
