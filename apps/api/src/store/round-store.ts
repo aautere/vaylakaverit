@@ -684,7 +684,7 @@ function createPlayer(
     throw new Error('Anna pelaajan nimi.');
   }
   if (!Number.isFinite(handicapIndex)) {
-    throw new Error('Anna kelvollinen tasoitusindeksi.');
+    throw new Error('Anna kelvollinen tasoitus.');
   }
 
   const selectedTeeLabel = teeLabel ?? courseSnapshot.defaultTeeLabel;
@@ -701,7 +701,7 @@ function createPlayer(
     if (!courseSnapshot.supportedRatingTables.includes(ratingTable as 'men' | 'women')) {
       throw new Error('Valitse kentälle saatavilla oleva virallinen tasoitustaulukko.');
     }
-    throw new Error('Tasoitusindeksille ei löydy valitun tiin virallista pelitasoitusta.');
+    throw new Error('Tasoitukselle ei löydy valitun tiin virallista pelitasoitusta.');
   }
 
   return {

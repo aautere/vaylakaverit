@@ -270,7 +270,7 @@ function App() {
   const [activePlayerId, setActivePlayerId] = useState<string | null>(null);
   const [manualJoin, setManualJoin] = useState(false);
   const [joinLink, setJoinLink] = useState('');
-  const [handicapIndex, setHandicapIndex] = useState(18);
+  const [handicapIndex, setHandicapIndex] = useState('');
   const [teeLabel, setTeeLabel] = useState('');
   const [ratingTable, setRatingTable] = useState<RatingTable>('men');
   const [courses, setCourses] = useState<PreviewCourse[]>([]);
@@ -617,6 +617,11 @@ function App() {
     setError(null);
     setCourseSelectionIssue(null);
     setNotice(null);
+    const parsedHandicap = Number(handicapIndex);
+    if (!handicapIndex || !Number.isFinite(parsedHandicap)) {
+      setError('Anna kelvollinen tasoitus.');
+      return;
+    }
     if (startGames.length === 0) {
       setError('Valitse vähintään yksi peli.');
       return;
@@ -635,7 +640,7 @@ function App() {
       setCreatingRound(true);
       const createdRound = await request<PreviewRound>('/api/preview/rounds', {
         name,
-        handicapIndex,
+        handicapIndex: parsedHandicap,
         teeLabel,
         ratingTable,
         courseId: selectedCourse.courseId,
@@ -753,6 +758,12 @@ function App() {
       return;
     }
 
+    const parsedHandicap = Number(handicapIndex);
+    if (!handicapIndex || !Number.isFinite(parsedHandicap)) {
+      setError('Anna kelvollinen tasoitus.');
+      return;
+    }
+
     if (navigator.onLine === false) {
       setError(offlineInvitationMessage());
       return;
@@ -764,7 +775,7 @@ function App() {
         `/api/preview/invitations/${encodeURIComponent(invitationToken)}/join`,
         {
           name,
-          handicapIndex,
+          handicapIndex: parsedHandicap,
           teeLabel,
           ratingTable,
         },
@@ -1312,14 +1323,15 @@ function App() {
                 </>
               ) : null}
               <label className="grid gap-2 text-sm font-semibold" htmlFor="handicap-index">
-                Tasoitusindeksi
+                Tasoitus
                 <input
                   id="handicap-index"
                   className="min-h-12 rounded-xl bg-white px-3 text-base text-[#13251f]"
                   type="number"
                   step="0.1"
                   value={handicapIndex}
-                  onChange={(event) => setHandicapIndex(Number(event.target.value))}
+                  onChange={(event) => setHandicapIndex(event.target.value)}
+                  required
                 />
               </label>
               {!joinInvitationToken && !manualJoin ? (
@@ -2089,7 +2101,7 @@ function RoundLobby({
             />
           </label>
           <label className="mt-3 grid gap-2 text-sm font-semibold" htmlFor="lobby-handicap-index">
-            Tasoitusindeksi
+            Tasoitus
             <input
               id="lobby-handicap-index"
               className="min-h-12 rounded-xl border border-[#c9d6ca] px-3"

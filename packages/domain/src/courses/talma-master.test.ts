@@ -56,10 +56,10 @@ describe('Golf Talma Master course data', () => {
 
   it('rejects a Handicap Index outside the selected official table in Finnish', () => {
     expect(() => lookupTalmaMasterPlayingHandicap('52', 'men', 54.1)).toThrow(
-      'Tasoitusindeksille 54.1 ei löydy Golf Talma Masterin tiin 52 miesten virallisesta pelitasoitustaulukosta.',
+      'Tasoitukselle 54.1 ei löydy Golf Talma Masterin tiin 52 miesten virallisesta pelitasoitustaulukosta.',
     );
     expect(() => lookupTalmaMasterPlayingHandicap('52', 'women', -4.2)).toThrow(
-      'Tasoitusindeksille -4.2 ei löydy Golf Talma Masterin tiin 52 naisten virallisesta pelitasoitustaulukosta.',
+      'Tasoitukselle -4.2 ei löydy Golf Talma Masterin tiin 52 naisten virallisesta pelitasoitustaulukosta.',
     );
   });
 });

@@ -20,7 +20,7 @@ export class PlayingHandicapLookupError extends Error {
     public readonly handicapIndex: number,
   ) {
     super(
-      `Tasoitusindeksille ${handicapIndex} ei löydy Golf Talma Masterin tiin ${teeLabel} ${ratingTable === 'men' ? 'miesten' : ratingTable === 'women' ? 'naisten' : 'valitusta'} virallisesta pelitasoitustaulukosta.`,
+      `Tasoitukselle ${handicapIndex} ei löydy Golf Talma Masterin tiin ${teeLabel} ${ratingTable === 'men' ? 'miesten' : ratingTable === 'women' ? 'naisten' : 'valitusta'} virallisesta pelitasoitustaulukosta.`,
     );
     this.name = 'PlayingHandicapLookupError';
   }
