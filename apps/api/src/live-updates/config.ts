@@ -16,7 +16,7 @@ export function readLiveUpdateConfig(
   environment: NodeJS.ProcessEnv = process.env,
 ): LiveUpdateConfig {
   const runtimeMode = readRuntimeMode(environment);
-  const expectedTransport = runtimeMode === 'production' ? 'web-pubsub' : 'poll';
+  const expectedTransport = runtimeMode === 'local-preview' ? 'poll' : 'web-pubsub';
 
   if (
     environment.ROUND_UPDATE_TRANSPORT &&

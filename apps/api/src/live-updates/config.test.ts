@@ -6,8 +6,36 @@ describe('live update configuration', () => {
     expect(readLiveUpdateConfig({})).toEqual({ kind: 'poll' });
   });
 
-  it('uses polling in shared development without Azure Web PubSub settings', () => {
-    expect(readLiveUpdateConfig({ APP_RUNTIME: 'shared-development' })).toEqual({ kind: 'poll' });
+  it('requires Azure Web PubSub settings in shared development', () => {
+    expect(() => readLiveUpdateConfig({ APP_RUNTIME: 'shared-development' })).toThrow(
+      'WEB_PUBSUB_ENDPOINT is required',
+    );
+  });
+
+  it('uses Azure Web PubSub in shared development so it matches production', () => {
+    expect(
+      readLiveUpdateConfig({
+        APP_RUNTIME: 'shared-development',
+        ROUND_UPDATE_TRANSPORT: 'web-pubsub',
+        WEB_PUBSUB_ENDPOINT: 'https://vaylakaverit.webpubsub.azure.com',
+        WEB_PUBSUB_HUB: 'rounds',
+      }),
+    ).toEqual({
+      kind: 'web-pubsub',
+      endpoint: 'https://vaylakaverit.webpubsub.azure.com',
+      hub: 'rounds',
+    });
+  });
+
+  it('prevents polling in shared development', () => {
+    expect(() =>
+      readLiveUpdateConfig({
+        APP_RUNTIME: 'shared-development',
+        ROUND_UPDATE_TRANSPORT: 'poll',
+      }),
+    ).toThrow(
+      'ROUND_UPDATE_TRANSPORT must be "web-pubsub" when APP_RUNTIME is "shared-development".',
+    );
   });
 
   it('requires Azure Web PubSub settings for production', () => {

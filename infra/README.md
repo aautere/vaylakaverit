@@ -36,8 +36,10 @@ deploys successfully but leaves the Node worker unable to resolve `@azure/functi
 starts and reports healthy while indexing zero functions.
 
 Local preview uses an in-memory store, guest identity, and polling without Azure resources.
-Published development uses Cosmos DB, device-local pseudonymous guest identities, and polling so
-testers can create and join the same round from separate devices. Production uses Cosmos DB, Apple
+Published development uses Cosmos DB, device-local pseudonymous guest identities, and Web PubSub so
+testers can create and join the same round from separate devices and exercise the same live-update
+path as production. Development is where the application is tested, so it deliberately runs the same
+back ends as production; only the identity provider differs. Production uses Cosmos DB, Apple
 authentication, and Web PubSub; configure its Apple settings through secure runtime configuration
 before deployment.
 
@@ -130,9 +132,8 @@ exists, but `az cosmosdb sql role assignment create` mints a fresh assignment id
 does not detect an equivalent existing assignment, so the script checks for the Cosmos assignment
 before creating it rather than accumulating duplicates.
 
-Published development uses Cosmos DB and polling, so it needs the Cosmos DB grant. Production also
-needs the Web PubSub grant. Run the script before the first published-development or production
-deployment.
+Published development and production both use Cosmos DB and Web PubSub, so both need both grants.
+Run the script before the first published-development or production deployment.
 
 ## Local validation
 
